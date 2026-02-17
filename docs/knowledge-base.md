@@ -85,6 +85,7 @@ Priority order:
 ### Wizard flow
 - Welcome
 - Detect language
+- Optional language override
 - Databases (optional)
 - Message queues (optional)
 - Cache (optional)

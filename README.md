@@ -23,7 +23,7 @@ The wizard generates:
 
 ## Usage flow
 1. Start the wizard.
-2. The tool detects your project language.
+2. The tool detects your project language (you can override it).
 3. Select services by category (databases, queues, cache, analytics, proxies).
 4. Review selections, warnings, and generated outputs.
 5. Generate and run `docker compose up`.

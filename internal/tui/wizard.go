@@ -20,6 +20,7 @@ type step int
 const (
 	stepWelcome step = iota
 	stepDetect
+	stepLanguage
 	stepDatabase
 	stepMessageQueue
 	stepCache
@@ -51,6 +52,13 @@ type serviceChoice struct {
 	Category    string
 }
 
+type languageChoice struct {
+	ID          string
+	Label       string
+	Description string
+	Language    generator.Language
+}
+
 type model struct {
 	root string
 
@@ -64,6 +72,12 @@ type model struct {
 
 	langDetected bool
 	langDetails  generator.LanguageDetails
+	langOptions  []languageChoice
+	langCursor   int
+	overrideLang bool
+	overrideType generator.Language
+	detectDone   bool
+	langVisited  bool
 
 	services []serviceChoice
 	cursor   int
@@ -102,6 +116,7 @@ func RunWizard(root string) error {
 		headerSpring: harmonica.NewSpring(harmonica.FPS(60), 7.0, 0.6),
 		services:     serviceChoicesFromCatalog(services),
 		selected:     map[string]bool{},
+		langOptions:  defaultLanguageOptions(),
 	}
 	setSpinner(&m.spinner)
 
@@ -137,7 +152,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.step = stepError
 			return m, nil
 		}
-		m.step = stepDatabase
+		m.langOptions = languageOptionsForDetected(m.langDetails)
+		m.detectDone = true
+		m.step = stepDetect
 		m.animateHeader()
 		return m, nil
 	case generateDoneMsg:
@@ -165,6 +182,8 @@ func (m model) View() string {
 		content = m.viewWelcome()
 	case stepDetect:
 		content = m.viewDetect()
+	case stepLanguage:
+		content = m.viewLanguage()
 	case stepDatabase:
 		content = m.viewServices(stepDatabase)
 	case stepMessageQueue:
@@ -209,6 +228,41 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			return detectCmd(m.root)
 		}
 	case stepDetect:
+		if !m.detectDone {
+			return nil
+		}
+		switch key {
+		case "enter":
+			m.step = stepDatabase
+			m.animateHeader()
+		case "l":
+			m.langVisited = true
+			m.step = stepLanguage
+			m.animateHeader()
+		case "b":
+			m.step = stepWelcome
+			m.animateHeader()
+		}
+		return nil
+	case stepLanguage:
+		switch key {
+		case "up", "k":
+			if m.langCursor > 0 {
+				m.langCursor--
+			}
+		case "down", "j":
+			if m.langCursor < len(m.langOptions)-1 {
+				m.langCursor++
+			}
+		case "enter":
+			m.applyLanguageChoice()
+			m.langVisited = true
+			m.step = stepDatabase
+			m.animateHeader()
+		case "b":
+			m.step = stepDetect
+			m.animateHeader()
+		}
 		return nil
 	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
 		m.cursor = clampCursor(m.cursor, len(m.filteredServices(m.step)))
@@ -240,7 +294,7 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			}
 			m.step = stepGenerate
 			m.animateHeader()
-			return generateCmd(m.root, selectedServiceIDs(m.services, m.selected))
+			return generateCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
 		case "b":
 			m.step = stepProxy
 			m.animateHeader()
@@ -274,7 +328,7 @@ func (m *model) retryFromError() tea.Cmd {
 	if m.previousStep == stepGenerate {
 		m.step = stepGenerate
 		m.animateHeader()
-		return generateCmd(m.root, selectedServiceIDs(m.services, m.selected))
+		return generateCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
 	}
 	return nil
 }
@@ -299,16 +353,49 @@ func (m *model) updateHeaderSpring() {
 	}
 }
 
+func (m model) effectiveDetails() generator.LanguageDetails {
+	if !m.overrideLang {
+		return m.langDetails
+	}
+	updated := m.langDetails
+	updated.Type = m.overrideType
+	return updated
+}
+
+func (m *model) applyLanguageChoice() {
+	if m.langCursor < 0 || m.langCursor >= len(m.langOptions) {
+		return
+	}
+	choice := m.langOptions[m.langCursor]
+	if choice.ID == "auto" {
+		m.overrideLang = false
+		m.overrideType = ""
+		return
+	}
+	m.overrideLang = true
+	m.overrideType = choice.Language
+}
+
+func (m model) isLanguageSelected(option languageChoice) bool {
+	if option.ID == "auto" {
+		return !m.overrideLang
+	}
+	if !m.overrideLang {
+		return false
+	}
+	return m.overrideType == option.Language
+}
+
 func (m model) renderHeader() string {
 	indent := int(4 * m.headerPos)
 	padding := strings.Repeat(" ", indent)
 
-	stepText := fmt.Sprintf("Step %d/9", m.stepIndex())
+	stepText := fmt.Sprintf("Step %d/10", m.stepIndex())
 	langText := "language: detecting"
 	if m.langDetected {
-		langText = "language: " + languageLabelWithVersion(m.langDetails)
+		langText = "language: " + languageLabelWithVersion(m.effectiveDetails())
 	}
-	progress := progressBar(m.stepIndex(), 9, 22)
+	progress := progressBar(m.stepIndex(), 10, 22)
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(titleColor(m.frame))
 	art := titleArt()
@@ -339,7 +426,12 @@ func (m model) footerKeys() string {
 	case stepWelcome:
 		return "enter next | q quit"
 	case stepDetect:
+		if m.detectDone {
+			return "enter next | l choose language | b back | q quit"
+		}
 		return "detecting language..."
+	case stepLanguage:
+		return "up/down move | enter select | b back | q quit"
 	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
 		return "up/down move | space toggle | enter next | b back | q quit"
 	case stepReview:
@@ -369,9 +461,41 @@ func (m model) viewWelcome() string {
 }
 
 func (m model) viewDetect() string {
-	text := "Detecting project language"
-	line := fmt.Sprintf("%s %s", m.spinner.View(), text)
-	return cardStyle(m.width).Render(sectionTitle("Detect") + "\n\n" + line)
+	if !m.detectDone {
+		text := "Detecting project language"
+		line := fmt.Sprintf("%s %s", m.spinner.View(), text)
+		return cardStyle(m.width).Render(sectionTitle("Detect") + "\n\n" + line)
+	}
+
+	body := []string{
+		"Detected language:",
+		languageLabelWithVersion(m.effectiveDetails()),
+		"",
+		"Press l to choose a different language.",
+	}
+	return cardStyle(m.width).Render(sectionTitle("Detect") + "\n\n" + strings.Join(body, "\n"))
+}
+
+func (m model) viewLanguage() string {
+	items := make([]string, 0, len(m.langOptions))
+	for i, option := range m.langOptions {
+		cursor := " "
+		if i == m.langCursor {
+			cursor = ">"
+		}
+		selected := m.isLanguageSelected(option)
+		check := "[ ]"
+		if selected {
+			check = "[x]"
+		}
+		line := fmt.Sprintf("%s %s %s", cursor, check, option.Label)
+		if option.Description != "" {
+			line += "  " + mutedStyle().Render(option.Description)
+		}
+		items = append(items, serviceLineStyle(i == m.langCursor, selected).Render(line))
+	}
+	content := strings.Join(items, "\n")
+	return cardStyle(m.width).Render(sectionTitle("Language") + "\n\n" + content)
 }
 
 func (m model) viewServices(step step) string {
@@ -401,7 +525,7 @@ func (m model) viewReview() string {
 	body := []string{
 		"Review your selections:",
 		"",
-		fmt.Sprintf("Detected language: %s", languageLabelWithVersion(m.langDetails)),
+		fmt.Sprintf("Detected language: %s", languageLabelWithVersion(m.effectiveDetails())),
 		"",
 	}
 
@@ -559,6 +683,33 @@ func categoryOrder() []string {
 	return []string{"database", "message-queue", "cache", "analytics", "proxy"}
 }
 
+func defaultLanguageOptions() []languageChoice {
+	return []languageChoice{
+		{ID: "auto", Label: "Auto-detect", Description: "use detected language"},
+		{ID: "go", Label: "Go", Language: generator.LanguageGo},
+		{ID: "node", Label: "Node", Language: generator.LanguageNode},
+		{ID: "python", Label: "Python", Language: generator.LanguagePython},
+		{ID: "ruby", Label: "Ruby", Language: generator.LanguageRuby},
+		{ID: "php", Label: "PHP", Language: generator.LanguagePHP},
+		{ID: "java", Label: "Java", Language: generator.LanguageJava},
+		{ID: "dotnet", Label: ".NET", Language: generator.LanguageDotNet},
+	}
+}
+
+func languageOptionsForDetected(details generator.LanguageDetails) []languageChoice {
+	options := defaultLanguageOptions()
+	if details.Type == generator.LanguageUnknown {
+		return options
+	}
+	label := "Auto-detect"
+	versioned := languageLabelWithVersion(details)
+	if versioned != "" {
+		label = "Auto-detect (" + versioned + ")"
+	}
+	options[0].Label = label
+	return options
+}
+
 func clampCursor(cursor int, length int) int {
 	if length <= 0 {
 		return 0
@@ -593,7 +744,10 @@ func (m *model) nextStep() step {
 func (m *model) prevStep() step {
 	switch m.step {
 	case stepDatabase:
-		return stepWelcome
+		if m.langVisited {
+			return stepLanguage
+		}
+		return stepDetect
 	case stepMessageQueue:
 		return stepDatabase
 	case stepCache:
@@ -613,24 +767,26 @@ func (m model) stepIndex() int {
 		return 1
 	case stepDetect:
 		return 2
-	case stepDatabase:
+	case stepLanguage:
 		return 3
-	case stepMessageQueue:
+	case stepDatabase:
 		return 4
-	case stepCache:
+	case stepMessageQueue:
 		return 5
-	case stepAnalytics:
+	case stepCache:
 		return 6
-	case stepProxy:
+	case stepAnalytics:
 		return 7
-	case stepReview:
+	case stepProxy:
 		return 8
+	case stepReview:
+		return 9
 	case stepGenerate:
-		return 9
+		return 10
 	case stepResult:
-		return 9
+		return 10
 	case stepError:
-		return 9
+		return 10
 	default:
 		return 1
 	}
@@ -643,11 +799,14 @@ func detectCmd(root string) tea.Cmd {
 	}
 }
 
-func generateCmd(root string, services []string) tea.Cmd {
+func generateCmd(root string, services []string, overrideLang bool, overrideType generator.Language) tea.Cmd {
 	return func() tea.Msg {
 		lang, err := generator.DetectLanguage(root)
 		if err != nil {
 			return generateDoneMsg{err: err}
+		}
+		if overrideLang {
+			lang.Type = overrideType
 		}
 		dockerfile, err := generator.Dockerfile(lang)
 		if err != nil {
