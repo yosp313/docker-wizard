@@ -58,17 +58,11 @@ trap cleanup EXIT
 
 printf '%s\n' "Downloading $ARCHIVE_URL"
 curl -fsSL "$ARCHIVE_URL" -o "$tmpdir/src.tar.gz"
-tar -xzf "$tmpdir/src.tar.gz" -C "$tmpdir"
+mkdir -p "$tmpdir/src"
+tar -xzf "$tmpdir/src.tar.gz" -C "$tmpdir/src" --strip-components=1
 
-src_dir=""
-for dir in "$tmpdir"/*; do
-  if [ -d "$dir" ]; then
-    src_dir="$dir"
-    break
-  fi
-done
-
-if [ -z "$src_dir" ]; then
+src_dir="$tmpdir/src"
+if [ ! -d "$src_dir" ]; then
   printf '%s\n' "failed to extract source" >&2
   exit 1
 fi
