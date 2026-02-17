@@ -58,10 +58,14 @@ trap cleanup EXIT
 
 printf '%s\n' "Downloading $ARCHIVE_URL"
 curl -fsSL "$ARCHIVE_URL" -o "$tmpdir/src.tar.gz"
-mkdir -p "$tmpdir/src"
-tar -xzf "$tmpdir/src.tar.gz" -C "$tmpdir/src" --strip-components=1
+top_dir=$(tar -tzf "$tmpdir/src.tar.gz" | sed -n '1p' | cut -d/ -f1)
+if [ -z "$top_dir" ]; then
+  printf '%s\n' "failed to read archive" >&2
+  exit 1
+fi
 
-src_dir="$tmpdir/src"
+tar -xzf "$tmpdir/src.tar.gz" -C "$tmpdir"
+src_dir="$tmpdir/$top_dir"
 if [ ! -d "$src_dir" ]; then
   printf '%s\n' "failed to extract source" >&2
   exit 1
