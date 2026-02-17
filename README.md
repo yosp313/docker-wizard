@@ -17,6 +17,16 @@ Docker Wizard is a Go TUI that scaffolds a Docker development stack for your pro
 go run .
 ```
 
+## Install (curl)
+```bash
+curl -fsSL https://raw.githubusercontent.com/yosp313/docker-wizard/main/install.sh | sh
+```
+
+## Version
+```bash
+docker-wizard --version
+```
+
 The wizard generates:
 - `Dockerfile`
 - `docker-compose.yml`
