@@ -1,8 +1,17 @@
 package app
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+
+	"docker-wizard/internal/tui"
+)
 
 func Run() error {
-	fmt.Println("hello from docker-wizard")
-	return nil
+	root, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	return tui.RunWizard(root)
 }
