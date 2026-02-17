@@ -73,6 +73,12 @@ func normalizeCatalog(catalog *ServiceCatalog) error {
 		if svc.Label == "" {
 			svc.Label = svc.ID
 		}
+		if svc.Selectable && svc.Category == "" {
+			return fmt.Errorf("service %s missing category", svc.ID)
+		}
+		if svc.Category != "" && !validCategory(svc.Category) {
+			return fmt.Errorf("service %s has invalid category: %s", svc.ID, svc.Category)
+		}
 	}
 
 	for _, svc := range catalog.Services {
@@ -89,6 +95,15 @@ func normalizeCatalog(catalog *ServiceCatalog) error {
 	}
 
 	return nil
+}
+
+func validCategory(category string) bool {
+	switch category {
+	case "database", "message-queue", "cache", "analytics", "proxy":
+		return true
+	default:
+		return false
+	}
 }
 
 func SelectableServices(root string) ([]ServiceSpec, error) {

@@ -20,7 +20,11 @@ type step int
 const (
 	stepWelcome step = iota
 	stepDetect
-	stepServices
+	stepDatabase
+	stepMessageQueue
+	stepCache
+	stepAnalytics
+	stepProxy
 	stepReview
 	stepGenerate
 	stepResult
@@ -44,6 +48,7 @@ type serviceChoice struct {
 	Label       string
 	Selected    bool
 	Description string
+	Category    string
 }
 
 type model struct {
@@ -62,6 +67,7 @@ type model struct {
 
 	services []serviceChoice
 	cursor   int
+	selected map[string]bool
 	warnings []string
 	frame    int
 
@@ -95,6 +101,7 @@ func RunWizard(root string) error {
 		spinner:      spinner.New(),
 		headerSpring: harmonica.NewSpring(harmonica.FPS(60), 7.0, 0.6),
 		services:     serviceChoicesFromCatalog(services),
+		selected:     map[string]bool{},
 	}
 	setSpinner(&m.spinner)
 
@@ -130,7 +137,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.step = stepError
 			return m, nil
 		}
-		m.step = stepServices
+		m.step = stepDatabase
 		m.animateHeader()
 		return m, nil
 	case generateDoneMsg:
@@ -158,8 +165,16 @@ func (m model) View() string {
 		content = m.viewWelcome()
 	case stepDetect:
 		content = m.viewDetect()
-	case stepServices:
-		content = m.viewServices()
+	case stepDatabase:
+		content = m.viewServices(stepDatabase)
+	case stepMessageQueue:
+		content = m.viewServices(stepMessageQueue)
+	case stepCache:
+		content = m.viewServices(stepCache)
+	case stepAnalytics:
+		content = m.viewServices(stepAnalytics)
+	case stepProxy:
+		content = m.viewServices(stepProxy)
 	case stepReview:
 		content = m.viewReview()
 	case stepGenerate:
@@ -195,7 +210,8 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		}
 	case stepDetect:
 		return nil
-	case stepServices:
+	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
+		m.cursor = clampCursor(m.cursor, len(m.filteredServices(m.step)))
 		switch key {
 		case "up", "k":
 			if m.cursor > 0 {
@@ -206,13 +222,14 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 				m.cursor++
 			}
 		case " ":
-			m.services[m.cursor].Selected = !m.services[m.cursor].Selected
+			if len(m.services) > 0 {
+				m.toggleCurrentSelection()
+			}
 		case "enter":
-			m.warnings = m.validateWarnings()
-			m.step = stepReview
+			m.step = m.nextStep()
 			m.animateHeader()
 		case "b":
-			m.step = stepWelcome
+			m.step = m.prevStep()
 			m.animateHeader()
 		}
 	case stepReview:
@@ -223,9 +240,9 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			}
 			m.step = stepGenerate
 			m.animateHeader()
-			return generateCmd(m.root, selectedServiceIDs(m.services))
+			return generateCmd(m.root, selectedServiceIDs(m.services, m.selected))
 		case "b":
-			m.step = stepServices
+			m.step = stepProxy
 			m.animateHeader()
 		}
 	case stepGenerate:
@@ -257,7 +274,7 @@ func (m *model) retryFromError() tea.Cmd {
 	if m.previousStep == stepGenerate {
 		m.step = stepGenerate
 		m.animateHeader()
-		return generateCmd(m.root, selectedServiceIDs(m.services))
+		return generateCmd(m.root, selectedServiceIDs(m.services, m.selected))
 	}
 	return nil
 }
@@ -286,12 +303,12 @@ func (m model) renderHeader() string {
 	indent := int(4 * m.headerPos)
 	padding := strings.Repeat(" ", indent)
 
-	stepText := fmt.Sprintf("Step %d/5", m.stepIndex())
+	stepText := fmt.Sprintf("Step %d/9", m.stepIndex())
 	langText := "language: detecting"
 	if m.langDetected {
 		langText = "language: " + languageLabel(m.langDetails.Type)
 	}
-	progress := progressBar(m.stepIndex(), 5, 22)
+	progress := progressBar(m.stepIndex(), 9, 22)
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(titleColor(m.frame))
 	art := titleArt()
@@ -323,7 +340,7 @@ func (m model) footerKeys() string {
 		return "enter next | q quit"
 	case stepDetect:
 		return "detecting language..."
-	case stepServices:
+	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
 		return "up/down move | space toggle | enter next | b back | q quit"
 	case stepReview:
 		if len(m.warnings) > 0 {
@@ -357,44 +374,52 @@ func (m model) viewDetect() string {
 	return cardStyle(m.width).Render(sectionTitle("Detect") + "\n\n" + line)
 }
 
-func (m model) viewServices() string {
-	items := make([]string, 0, len(m.services))
-	for i, svc := range m.services {
+func (m model) viewServices(step step) string {
+	filtered := m.filteredServices(step)
+	items := make([]string, 0, len(filtered))
+	for i, svc := range filtered {
 		cursor := " "
 		if i == m.cursor {
 			cursor = ">"
 		}
 		check := "[ ]"
-		if svc.Selected {
+		if m.selected[svc.ID] {
 			check = "[x]"
 		}
 		line := fmt.Sprintf("%s %s %s", cursor, check, svc.Label)
 		if svc.Description != "" {
 			line += "  " + mutedStyle().Render(svc.Description)
 		}
-		items = append(items, serviceLineStyle(i == m.cursor, svc.Selected).Render(line))
+		items = append(items, serviceLineStyle(i == m.cursor, m.selected[svc.ID]).Render(line))
 	}
 	content := strings.Join(items, "\n")
-	return cardStyle(m.width).Render(sectionTitle("Services") + "\n\n" + content)
+	return cardStyle(m.width).Render(sectionTitle(stepTitle(step)) + "\n\n" + content)
 }
 
 func (m model) viewReview() string {
-	services := selectedServiceLabels(m.services)
-	if len(services) == 0 {
-		services = []string{"none"}
-	}
-
+	groups := m.selectedByCategory()
 	body := []string{
 		"Review your selections:",
 		"",
 		fmt.Sprintf("Detected language: %s", languageLabel(m.langDetails.Type)),
-		"Services:",
-		"- " + strings.Join(services, "\n- "),
 		"",
+	}
+
+	for _, category := range categoryOrder() {
+		labels := groups[category]
+		if len(labels) == 0 {
+			labels = []string{"none"}
+		}
+		body = append(body, fmt.Sprintf("%s:", categoryLabel(category)))
+		body = append(body, "- "+strings.Join(labels, "\n- "))
+		body = append(body, "")
+	}
+
+	body = append(body,
 		"Files to be generated:",
 		"- docker-compose.yml",
 		"- Dockerfile",
-	}
+	)
 	if len(m.warnings) > 0 {
 		warningBlock := []string{
 			"",
@@ -438,22 +463,174 @@ func (m model) viewError() string {
 	return errorStyle(m.width).Render(sectionTitle("Error") + "\n\n" + strings.Join(body, "\n"))
 }
 
+func (m *model) toggleCurrentSelection() {
+	services := m.filteredServices(m.step)
+	if len(services) == 0 {
+		return
+	}
+	if m.cursor < 0 || m.cursor >= len(services) {
+		return
+	}
+	id := services[m.cursor].ID
+	if m.selected[id] {
+		delete(m.selected, id)
+		return
+	}
+	m.selected[id] = true
+}
+
+func (m model) filteredServices(step step) []serviceChoice {
+	category := stepCategory(step)
+	if category == "" {
+		return nil
+	}
+	filtered := make([]serviceChoice, 0, len(m.services))
+	for _, svc := range m.services {
+		if svc.Category == category {
+			filtered = append(filtered, svc)
+		}
+	}
+	return filtered
+}
+
+func (m model) selectedByCategory() map[string][]string {
+	grouped := map[string][]string{}
+	for _, svc := range m.services {
+		if !m.selected[svc.ID] {
+			continue
+		}
+		grouped[svc.Category] = append(grouped[svc.Category], svc.Label)
+	}
+	return grouped
+}
+
+func stepCategory(step step) string {
+	switch step {
+	case stepDatabase:
+		return "database"
+	case stepMessageQueue:
+		return "message-queue"
+	case stepCache:
+		return "cache"
+	case stepAnalytics:
+		return "analytics"
+	case stepProxy:
+		return "proxy"
+	default:
+		return ""
+	}
+}
+
+func stepTitle(step step) string {
+	switch step {
+	case stepDatabase:
+		return "Databases"
+	case stepMessageQueue:
+		return "Message Queues"
+	case stepCache:
+		return "Caching"
+	case stepAnalytics:
+		return "Analytics"
+	case stepProxy:
+		return "Webservers / Proxies"
+	default:
+		return "Services"
+	}
+}
+
+func categoryLabel(category string) string {
+	switch category {
+	case "database":
+		return "Databases"
+	case "message-queue":
+		return "Message Queues"
+	case "cache":
+		return "Caching"
+	case "analytics":
+		return "Analytics"
+	case "proxy":
+		return "Webservers / Proxies"
+	default:
+		return category
+	}
+}
+
+func categoryOrder() []string {
+	return []string{"database", "message-queue", "cache", "analytics", "proxy"}
+}
+
+func clampCursor(cursor int, length int) int {
+	if length <= 0 {
+		return 0
+	}
+	if cursor < 0 {
+		return 0
+	}
+	if cursor >= length {
+		return length - 1
+	}
+	return cursor
+}
+
+func (m *model) nextStep() step {
+	switch m.step {
+	case stepDatabase:
+		return stepMessageQueue
+	case stepMessageQueue:
+		return stepCache
+	case stepCache:
+		return stepAnalytics
+	case stepAnalytics:
+		return stepProxy
+	case stepProxy:
+		m.warnings = m.validateWarnings()
+		return stepReview
+	default:
+		return m.step
+	}
+}
+
+func (m *model) prevStep() step {
+	switch m.step {
+	case stepDatabase:
+		return stepWelcome
+	case stepMessageQueue:
+		return stepDatabase
+	case stepCache:
+		return stepMessageQueue
+	case stepAnalytics:
+		return stepCache
+	case stepProxy:
+		return stepAnalytics
+	default:
+		return m.step
+	}
+}
+
 func (m model) stepIndex() int {
 	switch m.step {
 	case stepWelcome:
 		return 1
 	case stepDetect:
 		return 2
-	case stepServices:
+	case stepDatabase:
 		return 3
-	case stepReview:
+	case stepMessageQueue:
 		return 4
+	case stepCache:
+		return 5
+	case stepAnalytics:
+		return 6
+	case stepProxy:
+		return 7
+	case stepReview:
+		return 8
 	case stepGenerate:
-		return 5
+		return 9
 	case stepResult:
-		return 5
+		return 9
 	case stepError:
-		return 5
+		return 9
 	default:
 		return 1
 	}
@@ -498,29 +675,20 @@ func serviceChoicesFromCatalog(services []generator.ServiceSpec) []serviceChoice
 			ID:          svc.ID,
 			Label:       svc.Label,
 			Description: svc.Description,
+			Category:    svc.Category,
 		})
 	}
 	return choices
 }
 
-func selectedServiceIDs(services []serviceChoice) []string {
+func selectedServiceIDs(services []serviceChoice, selected map[string]bool) []string {
 	ids := make([]string, 0, len(services))
 	for _, svc := range services {
-		if svc.Selected {
+		if selected[svc.ID] {
 			ids = append(ids, svc.ID)
 		}
 	}
 	return ids
-}
-
-func selectedServiceLabels(services []serviceChoice) []string {
-	labels := make([]string, 0, len(services))
-	for _, svc := range services {
-		if svc.Selected {
-			labels = append(labels, svc.Label)
-		}
-	}
-	return labels
 }
 
 func languageLabel(lang generator.Language) string {

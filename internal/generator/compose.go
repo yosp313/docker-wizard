@@ -61,6 +61,9 @@ func Compose(root string, selection ComposeSelection) (string, error) {
 		}
 	}
 
+	builder.WriteString("networks:\n")
+	builder.WriteString("  app-net:\n")
+
 	return builder.String(), nil
 }
 
@@ -87,9 +90,10 @@ func expandRequiredServices(selected map[string]bool, services map[string]Servic
 
 func appServiceSpec() ServiceSpec {
 	return ServiceSpec{
-		ID:    "app",
-		Name:  "app",
-		Ports: []string{"8080:8080"},
+		ID:     "app",
+		Name:   "app",
+		Ports:  []string{"8080:8080"},
+		Public: true,
 	}
 }
 
@@ -104,9 +108,22 @@ func writeService(builder *strings.Builder, svc ServiceSpec) {
 		builder.WriteString("    image: " + svc.Image + "\n")
 	}
 	if len(svc.Ports) > 0 {
-		builder.WriteString("    ports:\n")
-		for _, port := range svc.Ports {
-			builder.WriteString("      - \"" + port + "\"\n")
+		if svc.Public {
+			builder.WriteString("    ports:\n")
+			for _, port := range svc.Ports {
+				builder.WriteString("      - \"" + port + "\"\n")
+			}
+		} else {
+			expose := svc.Expose
+			if len(expose) == 0 {
+				expose = portsToExpose(svc.Ports)
+			}
+			if len(expose) > 0 {
+				builder.WriteString("    expose:\n")
+				for _, port := range expose {
+					builder.WriteString("      - \"" + port + "\"\n")
+				}
+			}
 		}
 	}
 	if len(svc.Env) > 0 {
@@ -133,6 +150,27 @@ func writeService(builder *strings.Builder, svc ServiceSpec) {
 			builder.WriteString("      - " + dep + "\n")
 		}
 	}
+	builder.WriteString("    networks:\n")
+	builder.WriteString("      - app-net\n")
+}
+
+func portsToExpose(ports []string) []string {
+	expose := make([]string, 0, len(ports))
+	for _, port := range ports {
+		container := containerPort(port)
+		if container != "" {
+			expose = append(expose, container)
+		}
+	}
+	return expose
+}
+
+func containerPort(port string) string {
+	parts := strings.Split(port, ":")
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return parts[len(parts)-1]
 }
 
 func uniqueStrings(values []string) []string {

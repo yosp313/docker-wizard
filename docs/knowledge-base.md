@@ -37,6 +37,9 @@
 - Compose version: 3.9
 - Base services include an `app` service with `build.context: .` and `dockerfile: Dockerfile`
 - Default app port mapping: `8080:8080`
+- Ports are only published for services marked `public` in `config/services.json`
+- Internal services use `expose` instead of host port publishing
+- Services share the `app-net` network
 - Volumes: declared for mysql, postgres, and caddy when selected
 
 ### Service defaults
@@ -63,9 +66,16 @@ Priority order:
 7. Fallback: unknown -> generic Dockerfile
 
 ## UX flow (TBD)
-- Step order and navigation (next/back/cancel)
-- Validation and error messaging
-- Preview and confirmation screens
+### Wizard flow
+- Welcome
+- Detect language
+- Databases (optional)
+- Message queues (optional)
+- Cache (optional)
+- Analytics (optional)
+- Webservers / Proxies (optional)
+- Review and generate
+- Result
 
 ## Extensibility (TBD)
 - How to add a new service

@@ -23,7 +23,7 @@ The wizard generates:
 ## Usage flow
 1. Start the wizard.
 2. The tool detects your project language.
-3. Select services to include in the compose file.
+3. Select services by category (databases, queues, cache, analytics, proxies).
 4. Review selections, warnings, and generated outputs.
 5. Generate and run `docker compose up`.
 
@@ -31,6 +31,7 @@ The wizard generates:
 - The compose file always includes an `app` service built from the local `Dockerfile`.
 - Services are sorted for stable diffs.
 - Volumes are declared when required by a service.
+- Only services marked `public` in `config/services.json` publish host ports.
 
 ## Service defaults
 - Service catalog lives in `config/services.json`.
