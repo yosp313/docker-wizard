@@ -40,16 +40,7 @@
 - Volumes: declared for mysql, postgres, and caddy when selected
 
 ### Service defaults
-- mysql: `mysql:8.0`, port `3306:3306`, env `MYSQL_ROOT_PASSWORD=example`, volume `mysql-data`
-- postgres: `postgres:16`, port `5432:5432`, env `POSTGRES_PASSWORD=example`, volume `postgres-data`
-- redis: `redis:7-alpine`, port `6379:6379`
-- analytics: `metabase/metabase:latest`, port `3000:3000`
-- nginx: `nginx:alpine`, port `80:80`
-- traefik: `traefik:v2.11`, ports `80:80`, `8080:8080`, command `--api.insecure=true`, `--providers.docker=true`
-- caddy: `caddy:2`, ports `80:80`, `443:443`, volume `caddy-data`
-- rabbitmq: `rabbitmq:3-management`, ports `5672:5672`, `15672:15672`
-- kafka: `bitnami/kafka:3.7`, port `9092:9092`, depends on zookeeper
-- zookeeper (auto-added when kafka is selected): `bitnami/zookeeper:3.9`, port `2181:2181`, env `ALLOW_ANONYMOUS_LOGIN=yes`
+Defaults are defined in `config/services.json` and can be edited there.
 
 ### Dockerfile templates
 - Go: multi-stage build from `golang:1.25-alpine` to `alpine:3.20`

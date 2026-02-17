@@ -10,34 +10,34 @@ type ComposeSelection struct {
 	Services []string
 }
 
-func Compose(selection ComposeSelection) (string, error) {
+func Compose(root string, selection ComposeSelection) (string, error) {
 	if selection.Services == nil {
 		selection.Services = []string{}
 	}
 
+	serviceMap, ordered, err := CatalogMap(root)
+	if err != nil {
+		return "", err
+	}
+
 	selected := make(map[string]bool, len(selection.Services))
 	for _, id := range selection.Services {
+		if _, ok := serviceMap[id]; !ok {
+			return "", fmt.Errorf("unknown service: %s", id)
+		}
 		selected[id] = true
+	}
+
+	if err := expandRequiredServices(selected, serviceMap); err != nil {
+		return "", err
 	}
 
 	services := []ServiceSpec{appServiceSpec()}
 	var volumes []string
 
-	for _, id := range serviceOrder {
-		if !selected[id] {
+	for _, spec := range ordered {
+		if !selected[spec.ID] {
 			continue
-		}
-
-		if id == "kafka" {
-			services = append(services, serviceCatalog["zookeeper"], serviceCatalog["kafka"])
-			volumes = append(volumes, serviceCatalog["zookeeper"].NamedVolumes...)
-			volumes = append(volumes, serviceCatalog["kafka"].NamedVolumes...)
-			continue
-		}
-
-		spec, ok := serviceCatalog[id]
-		if !ok {
-			return "", fmt.Errorf("unknown service: %s", id)
 		}
 		services = append(services, spec)
 		volumes = append(volumes, spec.NamedVolumes...)
@@ -62,6 +62,27 @@ func Compose(selection ComposeSelection) (string, error) {
 	}
 
 	return builder.String(), nil
+}
+
+func expandRequiredServices(selected map[string]bool, services map[string]ServiceSpec) error {
+	changed := true
+	for changed {
+		changed = false
+		for id := range selected {
+			svc, ok := services[id]
+			if !ok {
+				return fmt.Errorf("unknown service: %s", id)
+			}
+			for _, req := range svc.Requires {
+				if !selected[req] {
+					selected[req] = true
+					changed = true
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func appServiceSpec() ServiceSpec {

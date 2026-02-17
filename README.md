@@ -33,7 +33,9 @@ The wizard generates:
 - Volumes are declared when required by a service.
 
 ## Service defaults
-See `docs/knowledge-base.md` for the current image tags, ports, and environment defaults.
+- Service catalog lives in `config/services.json`.
+- Edit this file to add/remove services or change image tags, ports, and defaults.
+- See `docs/knowledge-base.md` for the current baseline conventions.
 
 ## Development
 ```bash

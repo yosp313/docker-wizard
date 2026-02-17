@@ -84,17 +84,22 @@ func RunWizard(root string) error {
 		root = cwd
 	}
 
+	services, err := generator.SelectableServices(root)
+	if err != nil {
+		return err
+	}
+
 	m := model{
 		root:         root,
 		step:         stepWelcome,
 		spinner:      spinner.New(),
 		headerSpring: harmonica.NewSpring(harmonica.FPS(60), 7.0, 0.6),
-		services:     defaultServiceChoices(),
+		services:     serviceChoicesFromCatalog(services),
 	}
 	setSpinner(&m.spinner)
 
 	program := tea.NewProgram(m, tea.WithAltScreen())
-	_, err := program.Run()
+	_, err = program.Run()
 	return err
 }
 
@@ -471,7 +476,7 @@ func generateCmd(root string, services []string) tea.Cmd {
 		if err != nil {
 			return generateDoneMsg{err: err}
 		}
-		compose, err := generator.Compose(generator.ComposeSelection{Services: services})
+		compose, err := generator.Compose(root, generator.ComposeSelection{Services: services})
 		if err != nil {
 			return generateDoneMsg{err: err}
 		}
@@ -486,18 +491,16 @@ func tickCmd() tea.Cmd {
 	})
 }
 
-func defaultServiceChoices() []serviceChoice {
-	return []serviceChoice{
-		{ID: "mysql", Label: "MySQL", Description: "relational database"},
-		{ID: "postgres", Label: "PostgreSQL", Description: "relational database"},
-		{ID: "redis", Label: "Redis", Description: "cache and queue"},
-		{ID: "analytics", Label: "Analytics", Description: "Metabase dashboard"},
-		{ID: "nginx", Label: "Nginx", Description: "reverse proxy"},
-		{ID: "traefik", Label: "Traefik", Description: "dynamic edge router"},
-		{ID: "caddy", Label: "Caddy", Description: "auto HTTPS proxy"},
-		{ID: "rabbitmq", Label: "RabbitMQ", Description: "message broker"},
-		{ID: "kafka", Label: "Kafka", Description: "event streaming"},
+func serviceChoicesFromCatalog(services []generator.ServiceSpec) []serviceChoice {
+	choices := make([]serviceChoice, 0, len(services))
+	for _, svc := range services {
+		choices = append(choices, serviceChoice{
+			ID:          svc.ID,
+			Label:       svc.Label,
+			Description: svc.Description,
+		})
 	}
+	return choices
 }
 
 func selectedServiceIDs(services []serviceChoice) []string {

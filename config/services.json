@@ -1,0 +1,123 @@
+{
+  "services": [
+    {
+      "id": "mysql",
+      "name": "mysql",
+      "label": "MySQL",
+      "description": "relational database",
+      "image": "mysql:8.0",
+      "ports": ["3306:3306"],
+      "env": ["MYSQL_ROOT_PASSWORD=example"],
+      "volumeMounts": ["mysql-data:/var/lib/mysql"],
+      "namedVolumes": ["mysql-data"],
+      "selectable": true,
+      "order": 10
+    },
+    {
+      "id": "postgres",
+      "name": "postgres",
+      "label": "PostgreSQL",
+      "description": "relational database",
+      "image": "postgres:16",
+      "ports": ["5432:5432"],
+      "env": ["POSTGRES_PASSWORD=example"],
+      "volumeMounts": ["postgres-data:/var/lib/postgresql/data"],
+      "namedVolumes": ["postgres-data"],
+      "selectable": true,
+      "order": 20
+    },
+    {
+      "id": "redis",
+      "name": "redis",
+      "label": "Redis",
+      "description": "cache and queue",
+      "image": "redis:7-alpine",
+      "ports": ["6379:6379"],
+      "selectable": true,
+      "order": 30
+    },
+    {
+      "id": "analytics",
+      "name": "analytics",
+      "label": "Analytics",
+      "description": "Metabase dashboard",
+      "image": "metabase/metabase:latest",
+      "ports": ["3000:3000"],
+      "selectable": true,
+      "order": 40
+    },
+    {
+      "id": "nginx",
+      "name": "nginx",
+      "label": "Nginx",
+      "description": "reverse proxy",
+      "image": "nginx:alpine",
+      "ports": ["80:80"],
+      "selectable": true,
+      "order": 50
+    },
+    {
+      "id": "traefik",
+      "name": "traefik",
+      "label": "Traefik",
+      "description": "dynamic edge router",
+      "image": "traefik:v2.11",
+      "ports": ["80:80", "8080:8080"],
+      "command": ["--api.insecure=true", "--providers.docker=true"],
+      "selectable": true,
+      "order": 60
+    },
+    {
+      "id": "caddy",
+      "name": "caddy",
+      "label": "Caddy",
+      "description": "auto HTTPS proxy",
+      "image": "caddy:2",
+      "ports": ["80:80", "443:443"],
+      "volumeMounts": ["caddy-data:/data"],
+      "namedVolumes": ["caddy-data"],
+      "selectable": true,
+      "order": 70
+    },
+    {
+      "id": "rabbitmq",
+      "name": "rabbitmq",
+      "label": "RabbitMQ",
+      "description": "message broker",
+      "image": "rabbitmq:3-management",
+      "ports": ["5672:5672", "15672:15672"],
+      "selectable": true,
+      "order": 80
+    },
+    {
+      "id": "zookeeper",
+      "name": "zookeeper",
+      "label": "Zookeeper",
+      "description": "Kafka coordination",
+      "image": "bitnami/zookeeper:3.9",
+      "ports": ["2181:2181"],
+      "env": ["ALLOW_ANONYMOUS_LOGIN=yes"],
+      "selectable": false,
+      "order": 90
+    },
+    {
+      "id": "kafka",
+      "name": "kafka",
+      "label": "Kafka",
+      "description": "event streaming",
+      "image": "bitnami/kafka:3.7",
+      "ports": ["9092:9092"],
+      "env": [
+        "KAFKA_BROKER_ID=1",
+        "KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181",
+        "KAFKA_LISTENERS=PLAINTEXT://:9092",
+        "KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092",
+        "ALLOW_PLAINTEXT_LISTENER=yes"
+      ],
+      "dependsOn": ["zookeeper"],
+      "requires": ["zookeeper"],
+      "selectable": true,
+      "order": 100
+    }
+  ]
+}
