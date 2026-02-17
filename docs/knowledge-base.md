@@ -55,6 +55,7 @@ Defaults are defined in `config/services.json` and can be edited there.
 - Node: `node:20-alpine` with npm/yarn/pnpm auto-detection
 - Python: `python:3.12-slim`, optional requirements install
 - Ruby: `ruby:3.3-alpine` with bundler
+- PHP: `php:8.3-fpm-alpine`
 - Java: `eclipse-temurin:21-jre`
 - .NET: `mcr.microsoft.com/dotnet/aspnet:8.0`
 - Fallback: `alpine:3.20`
@@ -66,9 +67,19 @@ Priority order:
 2. Node: `package.json` (detects package manager via lock file)
 3. Python: `requirements.txt`, `pyproject.toml`, or `Pipfile`
 4. Ruby: `Gemfile`
-5. Java: `pom.xml`, `build.gradle`, `build.gradle.kts`
-6. .NET: `*.csproj`
-7. Fallback: unknown -> generic Dockerfile
+5. PHP: `composer.json` or `.php-version`
+6. Java: `pom.xml`, `build.gradle`, `build.gradle.kts`
+7. .NET: `*.csproj`
+8. Fallback: unknown -> generic Dockerfile
+
+### Version detection
+- Go: `go.mod` `go` directive
+- Node: `.nvmrc`, `.node-version`, or `package.json` `engines.node`
+- Python: `.python-version`, `runtime.txt`, or `pyproject.toml` `requires-python`
+- Ruby: `.ruby-version`
+- PHP: `.php-version` or `composer.json` `config.platform.php`
+- Java: `pom.xml` (`maven.compiler.release/source` or `java.version`), or Gradle toolchain/source compatibility
+- .NET: `global.json` SDK version
 
 ## UX flow (TBD)
 ### Wizard flow

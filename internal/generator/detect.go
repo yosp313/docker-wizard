@@ -13,6 +13,7 @@ const (
 	LanguageNode    Language = "node"
 	LanguagePython  Language = "python"
 	LanguageRuby    Language = "ruby"
+	LanguagePHP     Language = "php"
 	LanguageJava    Language = "java"
 	LanguageDotNet  Language = "dotnet"
 	LanguageUnknown Language = "unknown"
@@ -31,10 +32,19 @@ type LanguageDetails struct {
 	HasPipfile      bool
 	HasGemfile      bool
 	HasGemfileLock  bool
+	HasComposerJSON bool
+	HasPHPVersion   bool
 	HasPomXML       bool
 	HasGradle       bool
 	HasGradleKts    bool
 	HasCSProj       bool
+	GoVersion       string
+	NodeVersion     string
+	PythonVersion   string
+	RubyVersion     string
+	PHPVersion      string
+	JavaVersion     string
+	DotNetVersion   string
 }
 
 func DetectLanguage(root string) (LanguageDetails, error) {
@@ -58,6 +68,8 @@ func DetectLanguage(root string) (LanguageDetails, error) {
 
 	details.HasGemfile = fileExists(filepath.Join(root, "Gemfile"))
 	details.HasGemfileLock = fileExists(filepath.Join(root, "Gemfile.lock"))
+	details.HasComposerJSON = fileExists(filepath.Join(root, "composer.json"))
+	details.HasPHPVersion = fileExists(filepath.Join(root, ".php-version"))
 
 	details.HasPomXML = fileExists(filepath.Join(root, "pom.xml"))
 	details.HasGradle = fileExists(filepath.Join(root, "build.gradle"))
@@ -69,6 +81,14 @@ func DetectLanguage(root string) (LanguageDetails, error) {
 	}
 	details.HasCSProj = len(csproj) > 0
 
+	details.GoVersion = detectGoVersion(root)
+	details.NodeVersion = detectNodeVersion(root)
+	details.PythonVersion = detectPythonVersion(root)
+	details.RubyVersion = detectRubyVersion(root)
+	details.PHPVersion = detectPHPVersion(root)
+	details.JavaVersion = detectJavaVersion(root)
+	details.DotNetVersion = detectDotNetVersion(root)
+
 	switch {
 	case details.HasGoMod:
 		details.Type = LanguageGo
@@ -78,6 +98,8 @@ func DetectLanguage(root string) (LanguageDetails, error) {
 		details.Type = LanguagePython
 	case details.HasGemfile:
 		details.Type = LanguageRuby
+	case details.HasComposerJSON || details.HasPHPVersion:
+		details.Type = LanguagePHP
 	case details.HasPomXML || details.HasGradle || details.HasGradleKts:
 		details.Type = LanguageJava
 	case details.HasCSProj:

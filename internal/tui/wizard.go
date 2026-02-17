@@ -306,7 +306,7 @@ func (m model) renderHeader() string {
 	stepText := fmt.Sprintf("Step %d/9", m.stepIndex())
 	langText := "language: detecting"
 	if m.langDetected {
-		langText = "language: " + languageLabel(m.langDetails.Type)
+		langText = "language: " + languageLabelWithVersion(m.langDetails)
 	}
 	progress := progressBar(m.stepIndex(), 9, 22)
 
@@ -401,7 +401,7 @@ func (m model) viewReview() string {
 	body := []string{
 		"Review your selections:",
 		"",
-		fmt.Sprintf("Detected language: %s", languageLabel(m.langDetails.Type)),
+		fmt.Sprintf("Detected language: %s", languageLabelWithVersion(m.langDetails)),
 		"",
 	}
 
@@ -701,6 +701,8 @@ func languageLabel(lang generator.Language) string {
 		return "Python"
 	case generator.LanguageRuby:
 		return "Ruby"
+	case generator.LanguagePHP:
+		return "PHP"
 	case generator.LanguageJava:
 		return "Java"
 	case generator.LanguageDotNet:
@@ -710,6 +712,31 @@ func languageLabel(lang generator.Language) string {
 	default:
 		return string(lang)
 	}
+}
+
+func languageLabelWithVersion(details generator.LanguageDetails) string {
+	base := languageLabel(details.Type)
+	version := ""
+	switch details.Type {
+	case generator.LanguageGo:
+		version = details.GoVersion
+	case generator.LanguageNode:
+		version = details.NodeVersion
+	case generator.LanguagePython:
+		version = details.PythonVersion
+	case generator.LanguageRuby:
+		version = details.RubyVersion
+	case generator.LanguagePHP:
+		version = details.PHPVersion
+	case generator.LanguageJava:
+		version = details.JavaVersion
+	case generator.LanguageDotNet:
+		version = details.DotNetVersion
+	}
+	if version == "" {
+		return base
+	}
+	return base + " " + version
 }
 
 func (m model) validateWarnings() []string {

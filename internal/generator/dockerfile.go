@@ -12,6 +12,8 @@ func Dockerfile(details LanguageDetails) (string, error) {
 		return dockerfilePython(details), nil
 	case LanguageRuby:
 		return dockerfileRuby(details), nil
+	case LanguagePHP:
+		return dockerfilePHP(details), nil
 	case LanguageJava:
 		return dockerfileJava(details), nil
 	case LanguageDotNet:
@@ -28,9 +30,10 @@ func dockerfileGo(details LanguageDetails) string {
 	if details.HasGoSum {
 		moduleFiles = "COPY go.mod go.sum ./\n"
 	}
+	goVersion := versionOrDefault(details.GoVersion, "1.25")
 
 	return "" +
-		"FROM golang:1.25-alpine AS build\n" +
+		"FROM golang:" + goVersion + "-alpine AS build\n" +
 		"WORKDIR /src\n" +
 		moduleFiles +
 		"RUN go mod download\n" +
@@ -49,6 +52,7 @@ func dockerfileNode(details LanguageDetails) string {
 	startCmd := "npm start"
 	lockCopy := ""
 	corepack := ""
+	nodeVersion := versionOrDefault(details.NodeVersion, "20")
 
 	if details.HasYarnLock {
 		installCmd = "yarn install --frozen-lockfile"
@@ -65,7 +69,7 @@ func dockerfileNode(details LanguageDetails) string {
 	}
 
 	return "" +
-		"FROM node:20-alpine\n" +
+		"FROM node:" + nodeVersion + "-alpine\n" +
 		"WORKDIR /app\n" +
 		"COPY package.json ./\n" +
 		lockCopy +
@@ -82,9 +86,10 @@ func dockerfilePython(details LanguageDetails) string {
 	if details.HasRequirements {
 		install = "COPY requirements.txt ./\nRUN pip install --no-cache-dir -r requirements.txt\n"
 	}
+	pythonVersion := versionOrDefault(details.PythonVersion, "3.12")
 
 	return "" +
-		"FROM python:3.12-slim\n" +
+		"FROM python:" + pythonVersion + "-slim\n" +
 		"WORKDIR /app\n" +
 		install +
 		copy +
@@ -101,9 +106,10 @@ func dockerfileRuby(details LanguageDetails) string {
 		}
 		install += "RUN bundle install\n"
 	}
+	rubyVersion := versionOrDefault(details.RubyVersion, "3.3")
 
 	return "" +
-		"FROM ruby:3.3-alpine\n" +
+		"FROM ruby:" + rubyVersion + "-alpine\n" +
 		"WORKDIR /app\n" +
 		install +
 		"COPY . .\n" +
@@ -111,9 +117,26 @@ func dockerfileRuby(details LanguageDetails) string {
 		"CMD [\"ruby\", \"app.rb\"]\n"
 }
 
-func dockerfileJava(details LanguageDetails) string {
+func dockerfilePHP(details LanguageDetails) string {
+	phpVersion := versionOrDefault(details.PHPVersion, "8.3")
+	composerCopy := ""
+	if details.HasComposerJSON {
+		composerCopy = "COPY composer.json ./\n"
+	}
+
 	return "" +
-		"FROM eclipse-temurin:21-jre\n" +
+		"FROM php:" + phpVersion + "-fpm-alpine\n" +
+		"WORKDIR /app\n" +
+		composerCopy +
+		"COPY . .\n" +
+		"EXPOSE 8080\n" +
+		"CMD [\"php\", \"-S\", \"0.0.0.0:8080\", \"-t\", \"public\"]\n"
+}
+
+func dockerfileJava(details LanguageDetails) string {
+	javaVersion := versionOrDefault(details.JavaVersion, "21")
+	return "" +
+		"FROM eclipse-temurin:" + javaVersion + "-jre\n" +
 		"WORKDIR /app\n" +
 		"COPY . .\n" +
 		"EXPOSE 8080\n" +
@@ -121,8 +144,9 @@ func dockerfileJava(details LanguageDetails) string {
 }
 
 func dockerfileDotNet(details LanguageDetails) string {
+	dotnetVersion := versionOrDefault(details.DotNetVersion, "8.0")
 	return "" +
-		"FROM mcr.microsoft.com/dotnet/aspnet:8.0\n" +
+		"FROM mcr.microsoft.com/dotnet/aspnet:" + dotnetVersion + "\n" +
 		"WORKDIR /app\n" +
 		"COPY . .\n" +
 		"EXPOSE 8080\n" +
@@ -139,6 +163,13 @@ func dockerfileGeneric() string {
 
 func splitCmd(cmd string) []string {
 	return splitWords(cmd)
+}
+
+func versionOrDefault(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func joinCmdArgs(cmd string) string {

@@ -4,8 +4,9 @@ Docker Wizard is a Go TUI that scaffolds a Docker development stack for your pro
 
 ## Features
 - Step-by-step wizard UI with a polished header/footer and animations
-- Language detection with Dockerfile templates for Go, Node, Python, Ruby, Java, and .NET
-- Service catalog selection (MySQL, PostgreSQL, Redis, analytics, Nginx, Traefik, Caddy, RabbitMQ, Kafka)
+- Language + version detection with Dockerfile templates for Go, Node, Python, Ruby, PHP, Java, and .NET
+- Category-based service selection (databases, queues, cache, analytics, proxies)
+- Config-driven service catalog (edit `config/services.json`)
 - Deterministic, reproducible compose output
 - Safe file generation that avoids overwriting existing files
 
@@ -36,6 +37,7 @@ The wizard generates:
 ## Service defaults
 - Service catalog lives in `config/services.json`.
 - Edit this file to add/remove services or change image tags, ports, and defaults.
+- Services can declare categories, dependencies, and public exposure.
 - See `docs/knowledge-base.md` for the current baseline conventions.
 
 ## Development
