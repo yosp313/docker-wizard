@@ -45,6 +45,11 @@
 ### Service defaults
 Defaults are defined in `config/services.json` and can be edited there.
 
+### Service catalog additions
+- MongoDB (database)
+- Memcached (cache)
+- Plausible (analytics) with bundled Clickhouse and Postgres services
+
 ### Dockerfile templates
 - Go: multi-stage build from `golang:1.25-alpine` to `alpine:3.20`
 - Node: `node:20-alpine` with npm/yarn/pnpm auto-detection

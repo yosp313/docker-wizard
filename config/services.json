@@ -7,11 +7,19 @@
       "description": "relational database",
       "category": "database",
       "image": "mysql:8.0",
-      "ports": ["3306:3306"],
+      "ports": [
+        "3306:3306"
+      ],
       "public": false,
-      "env": ["MYSQL_ROOT_PASSWORD=example"],
-      "volumeMounts": ["mysql-data:/var/lib/mysql"],
-      "namedVolumes": ["mysql-data"],
+      "env": [
+        "MYSQL_ROOT_PASSWORD=example"
+      ],
+      "volumeMounts": [
+        "mysql-data:/var/lib/mysql"
+      ],
+      "namedVolumes": [
+        "mysql-data"
+      ],
       "selectable": true,
       "order": 10
     },
@@ -22,13 +30,41 @@
       "description": "relational database",
       "category": "database",
       "image": "postgres:16",
-      "ports": ["5432:5432"],
+      "ports": [
+        "5432:5432"
+      ],
       "public": false,
-      "env": ["POSTGRES_PASSWORD=example"],
-      "volumeMounts": ["postgres-data:/var/lib/postgresql/data"],
-      "namedVolumes": ["postgres-data"],
+      "env": [
+        "POSTGRES_PASSWORD=example"
+      ],
+      "volumeMounts": [
+        "postgres-data:/var/lib/postgresql/data"
+      ],
+      "namedVolumes": [
+        "postgres-data"
+      ],
       "selectable": true,
       "order": 20
+    },
+    {
+      "id": "mongodb",
+      "name": "mongodb",
+      "label": "MongoDB",
+      "description": "document database",
+      "category": "database",
+      "image": "mongo:7",
+      "ports": [
+        "27017:27017"
+      ],
+      "public": false,
+      "volumeMounts": [
+        "mongo-data:/data/db"
+      ],
+      "namedVolumes": [
+        "mongo-data"
+      ],
+      "selectable": true,
+      "order": 25
     },
     {
       "id": "redis",
@@ -37,22 +73,116 @@
       "description": "cache and queue",
       "category": "cache",
       "image": "redis:7-alpine",
-      "ports": ["6379:6379"],
+      "ports": [
+        "6379:6379"
+      ],
       "public": false,
       "selectable": true,
       "order": 30
     },
     {
-      "id": "analytics",
-      "name": "analytics",
-      "label": "Analytics",
+      "id": "memcached",
+      "name": "memcached",
+      "label": "Memcached",
+      "description": "in-memory cache",
+      "category": "cache",
+      "image": "memcached:1.6-alpine",
+      "ports": [
+        "11211:11211"
+      ],
+      "public": false,
+      "selectable": true,
+      "order": 35
+    },
+    {
+      "id": "metabase",
+      "name": "metabase",
+      "label": "Metabase",
       "description": "Metabase dashboard",
       "category": "analytics",
       "image": "metabase/metabase:latest",
-      "ports": ["3000:3000"],
+      "ports": [
+        "3000:3000"
+      ],
       "public": true,
       "selectable": true,
       "order": 40
+    },
+    {
+      "id": "plausible",
+      "name": "plausible",
+      "label": "Plausible",
+      "description": "web analytics",
+      "category": "analytics",
+      "image": "plausible/analytics:latest",
+      "ports": [
+        "8000:8000"
+      ],
+      "public": true,
+      "env": [
+        "BASE_URL=http://localhost:8000",
+        "SECRET_KEY_BASE=change-me",
+        "CLICKHOUSE_DATABASE=plausible",
+        "CLICKHOUSE_URL=http://plausible-db:8123",
+        "DATABASE_URL=postgres://postgres:example@plausible-postgres:5432/plausible"
+      ],
+      "dependsOn": [
+        "plausible-postgres",
+        "plausible-db"
+      ],
+      "requires": [
+        "plausible-postgres",
+        "plausible-db"
+      ],
+      "selectable": true,
+      "order": 45
+    },
+    {
+      "id": "plausible-postgres",
+      "name": "plausible-postgres",
+      "label": "Plausible Postgres",
+      "description": "plausible data store",
+      "category": "analytics",
+      "image": "postgres:16",
+      "ports": [
+        "5433:5432"
+      ],
+      "public": false,
+      "env": [
+        "POSTGRES_PASSWORD=example",
+        "POSTGRES_DB=plausible"
+      ],
+      "volumeMounts": [
+        "plausible-postgres:/var/lib/postgresql/data"
+      ],
+      "namedVolumes": [
+        "plausible-postgres"
+      ],
+      "selectable": false,
+      "order": 46
+    },
+    {
+      "id": "plausible-db",
+      "name": "plausible-db",
+      "label": "Plausible Clickhouse",
+      "description": "plausible analytics store",
+      "category": "analytics",
+      "image": "clickhouse/clickhouse-server:24.3",
+      "ports": [
+        "8123:8123"
+      ],
+      "public": false,
+      "env": [
+        "CLICKHOUSE_DB=plausible"
+      ],
+      "volumeMounts": [
+        "plausible-clickhouse:/var/lib/clickhouse"
+      ],
+      "namedVolumes": [
+        "plausible-clickhouse"
+      ],
+      "selectable": false,
+      "order": 47
     },
     {
       "id": "nginx",
@@ -61,7 +191,9 @@
       "description": "reverse proxy",
       "category": "proxy",
       "image": "nginx:alpine",
-      "ports": ["80:80"],
+      "ports": [
+        "80:80"
+      ],
       "public": true,
       "selectable": true,
       "order": 50
@@ -73,9 +205,15 @@
       "description": "dynamic edge router",
       "category": "proxy",
       "image": "traefik:v2.11",
-      "ports": ["80:80", "8080:8080"],
+      "ports": [
+        "80:80",
+        "8080:8080"
+      ],
       "public": true,
-      "command": ["--api.insecure=true", "--providers.docker=true"],
+      "command": [
+        "--api.insecure=true",
+        "--providers.docker=true"
+      ],
       "selectable": true,
       "order": 60
     },
@@ -86,10 +224,17 @@
       "description": "auto HTTPS proxy",
       "category": "proxy",
       "image": "caddy:2",
-      "ports": ["80:80", "443:443"],
+      "ports": [
+        "80:80",
+        "443:443"
+      ],
       "public": true,
-      "volumeMounts": ["caddy-data:/data"],
-      "namedVolumes": ["caddy-data"],
+      "volumeMounts": [
+        "caddy-data:/data"
+      ],
+      "namedVolumes": [
+        "caddy-data"
+      ],
       "selectable": true,
       "order": 70
     },
@@ -100,7 +245,10 @@
       "description": "message broker",
       "category": "message-queue",
       "image": "rabbitmq:3-management",
-      "ports": ["5672:5672", "15672:15672"],
+      "ports": [
+        "5672:5672",
+        "15672:15672"
+      ],
       "public": false,
       "selectable": true,
       "order": 80
@@ -112,9 +260,13 @@
       "description": "Kafka coordination",
       "category": "message-queue",
       "image": "bitnami/zookeeper:3.9",
-      "ports": ["2181:2181"],
+      "ports": [
+        "2181:2181"
+      ],
       "public": false,
-      "env": ["ALLOW_ANONYMOUS_LOGIN=yes"],
+      "env": [
+        "ALLOW_ANONYMOUS_LOGIN=yes"
+      ],
       "selectable": false,
       "order": 90
     },
@@ -125,7 +277,9 @@
       "description": "event streaming",
       "category": "message-queue",
       "image": "bitnami/kafka:3.7",
-      "ports": ["9092:9092"],
+      "ports": [
+        "9092:9092"
+      ],
       "public": false,
       "env": [
         "KAFKA_BROKER_ID=1",
@@ -134,8 +288,12 @@
         "KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092",
         "ALLOW_PLAINTEXT_LISTENER=yes"
       ],
-      "dependsOn": ["zookeeper"],
-      "requires": ["zookeeper"],
+      "dependsOn": [
+        "zookeeper"
+      ],
+      "requires": [
+        "zookeeper"
+      ],
       "selectable": true,
       "order": 100
     }
