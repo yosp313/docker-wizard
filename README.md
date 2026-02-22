@@ -1,6 +1,6 @@
 # Docker Wizard
 
-Docker Wizard is a Go TUI that scaffolds a Docker development stack for your project. It detects the primary language in your working directory, generates a matching `Dockerfile`, and builds a `docker-compose.yml` based on the services you select.
+Docker Wizard is a Go TUI that scaffolds a Docker development stack for your project. It detects the primary language in your working directory, generates a matching `Dockerfile`, and generates a `docker-compose.yml` based on the services you select.
 
 ## Features
 - Step-by-step wizard UI with a polished header/footer and animations
