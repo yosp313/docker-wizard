@@ -49,6 +49,10 @@ docker-wizard --version
 - `docker-compose.yml`
 - `.dockerignore` (only if missing)
 
+## Releases
+- Every push to `main` auto-tags a new patch release and publishes a GitHub Release.
+- Tags use `vX.Y.Z` and start at `v0.1.0` if no tags exist.
+
 ## Configuration
 - Service catalog lives in `config/services.json`.
 - Edit this file to add/remove services or change image tags, ports, and defaults.

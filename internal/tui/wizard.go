@@ -946,16 +946,24 @@ func detectCmd(root string) tea.Cmd {
 	}
 }
 
+func resolveLanguage(root string, overrideLang bool, overrideType generator.Language) (generator.LanguageDetails, error) {
+	details, err := generator.DetectLanguage(root)
+	if err != nil {
+		return generator.LanguageDetails{}, err
+	}
+	if overrideLang {
+		details.Type = overrideType
+	}
+	return details, nil
+}
+
 func previewCmd(root string, services []string, overrideLang bool, overrideType generator.Language) tea.Cmd {
 	return func() tea.Msg {
-		lang, err := generator.DetectLanguage(root)
+		details, err := resolveLanguage(root, overrideLang, overrideType)
 		if err != nil {
 			return previewDoneMsg{err: err}
 		}
-		if overrideLang {
-			lang.Type = overrideType
-		}
-		dockerfile, err := generator.Dockerfile(lang)
+		dockerfile, err := generator.Dockerfile(details)
 		if err != nil {
 			return previewDoneMsg{err: err}
 		}
@@ -970,14 +978,11 @@ func previewCmd(root string, services []string, overrideLang bool, overrideType 
 
 func generateCmd(root string, services []string, overrideLang bool, overrideType generator.Language) tea.Cmd {
 	return func() tea.Msg {
-		lang, err := generator.DetectLanguage(root)
+		details, err := resolveLanguage(root, overrideLang, overrideType)
 		if err != nil {
 			return generateDoneMsg{err: err}
 		}
-		if overrideLang {
-			lang.Type = overrideType
-		}
-		dockerfile, err := generator.Dockerfile(lang)
+		dockerfile, err := generator.Dockerfile(details)
 		if err != nil {
 			return generateDoneMsg{err: err}
 		}
@@ -1073,6 +1078,7 @@ func buildPreviewLines(preview generator.Preview, blockers []string) []string {
 	lines = append(lines, "")
 	lines = appendPreviewBlock(lines, generator.DockerfileFileName, preview.Dockerfile, true)
 	lines = append(lines, "")
+	// Only show .dockerignore content if we'd generate it.
 	showDockerignore := preview.Dockerignore.Status != generator.FileStatusExists
 	lines = appendPreviewBlock(lines, generator.DockerignoreFileName, preview.Dockerignore, showDockerignore)
 	if len(blockers) > 0 {
