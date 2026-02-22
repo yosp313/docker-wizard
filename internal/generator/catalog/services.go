@@ -1,4 +1,4 @@
-package generator
+package catalog
 
 type ServiceSpec struct {
 	ID           string   `json:"id"`

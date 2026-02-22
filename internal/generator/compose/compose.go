@@ -1,9 +1,11 @@
-package generator
+package compose
 
 import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"docker-wizard/internal/generator/catalog"
 )
 
 type ComposeSelection struct {
@@ -15,7 +17,7 @@ func Compose(root string, selection ComposeSelection) (string, error) {
 		selection.Services = []string{}
 	}
 
-	serviceMap, ordered, err := CatalogMap(root)
+	serviceMap, ordered, err := catalog.CatalogMap(root)
 	if err != nil {
 		return "", err
 	}
@@ -28,18 +30,18 @@ func Compose(root string, selection ComposeSelection) (string, error) {
 		selected[id] = true
 	}
 
-	if err := expandRequiredServices(selected, serviceMap); err != nil {
+	if err := ExpandRequiredServices(selected, serviceMap); err != nil {
 		return "", err
 	}
 
-	services := []ServiceSpec{appServiceSpec()}
+	services := []catalog.ServiceSpec{AppServiceSpec()}
 	var volumes []string
 
 	for _, spec := range ordered {
 		if !selected[spec.ID] {
 			continue
 		}
-		services = append(services, spec)
+		services = append(services, filterDepends(spec, selected))
 		volumes = append(volumes, spec.NamedVolumes...)
 	}
 
@@ -67,7 +69,7 @@ func Compose(root string, selection ComposeSelection) (string, error) {
 	return builder.String(), nil
 }
 
-func expandRequiredServices(selected map[string]bool, services map[string]ServiceSpec) error {
+func ExpandRequiredServices(selected map[string]bool, services map[string]catalog.ServiceSpec) error {
 	changed := true
 	for changed {
 		changed = false
@@ -88,8 +90,8 @@ func expandRequiredServices(selected map[string]bool, services map[string]Servic
 	return nil
 }
 
-func appServiceSpec() ServiceSpec {
-	return ServiceSpec{
+func AppServiceSpec() catalog.ServiceSpec {
+	return catalog.ServiceSpec{
 		ID:     "app",
 		Name:   "app",
 		Ports:  []string{"8080:8080"},
@@ -97,7 +99,7 @@ func appServiceSpec() ServiceSpec {
 	}
 }
 
-func writeService(builder *strings.Builder, svc ServiceSpec) {
+func writeService(builder *strings.Builder, svc catalog.ServiceSpec) {
 	builder.WriteString("  " + svc.Name + ":\n")
 	if svc.ID == "app" {
 		builder.WriteString("    build:\n")
@@ -107,18 +109,21 @@ func writeService(builder *strings.Builder, svc ServiceSpec) {
 	if svc.Image != "" {
 		builder.WriteString("    image: " + svc.Image + "\n")
 	}
-	if len(svc.Ports) > 0 {
+	ports := append([]string(nil), svc.Ports...)
+	if len(ports) > 0 {
+		sort.Strings(ports)
 		if svc.Public {
 			builder.WriteString("    ports:\n")
-			for _, port := range svc.Ports {
+			for _, port := range ports {
 				builder.WriteString("      - \"" + port + "\"\n")
 			}
 		} else {
-			expose := svc.Expose
+			expose := append([]string(nil), svc.Expose...)
 			if len(expose) == 0 {
-				expose = portsToExpose(svc.Ports)
+				expose = portsToExpose(ports)
 			}
 			if len(expose) > 0 {
+				sort.Strings(expose)
 				builder.WriteString("    expose:\n")
 				for _, port := range expose {
 					builder.WriteString("      - \"" + port + "\"\n")
@@ -145,13 +150,30 @@ func writeService(builder *strings.Builder, svc ServiceSpec) {
 		}
 	}
 	if len(svc.DependsOn) > 0 {
+		depends := append([]string(nil), svc.DependsOn...)
+		sort.Strings(depends)
 		builder.WriteString("    depends_on:\n")
-		for _, dep := range svc.DependsOn {
+		for _, dep := range depends {
 			builder.WriteString("      - " + dep + "\n")
 		}
 	}
 	builder.WriteString("    networks:\n")
 	builder.WriteString("      - app-net\n")
+}
+
+func filterDepends(spec catalog.ServiceSpec, selected map[string]bool) catalog.ServiceSpec {
+	if len(spec.DependsOn) == 0 {
+		return spec
+	}
+	filtered := make([]string, 0, len(spec.DependsOn))
+	for _, dep := range spec.DependsOn {
+		if dep == "app" || selected[dep] {
+			filtered = append(filtered, dep)
+		}
+	}
+	updated := spec
+	updated.DependsOn = filtered
+	return updated
 }
 
 func portsToExpose(ports []string) []string {

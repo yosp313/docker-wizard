@@ -1,4 +1,4 @@
-package generator
+package catalog
 
 import (
 	"encoding/json"

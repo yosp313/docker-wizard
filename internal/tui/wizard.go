@@ -27,10 +27,13 @@ const (
 	stepAnalytics
 	stepProxy
 	stepReview
+	stepPreview
 	stepGenerate
 	stepResult
 	stepError
 )
+
+const totalSteps = 11
 
 type tickMsg time.Time
 
@@ -42,6 +45,11 @@ type detectDoneMsg struct {
 type generateDoneMsg struct {
 	output generator.Output
 	err    error
+}
+
+type previewDoneMsg struct {
+	preview generator.Preview
+	err     error
 }
 
 type serviceChoice struct {
@@ -79,14 +87,20 @@ type model struct {
 	detectDone   bool
 	langVisited  bool
 
-	services []serviceChoice
-	cursor   int
-	selected map[string]bool
-	warnings []string
-	frame    int
+	services           []serviceChoice
+	cursor             int
+	selected           map[string]bool
+	warnings           []string
+	blockers           []string
+	createDockerignore bool
+	previewLines       []string
+	previewScroll      int
+	frame              int
 
-	output generator.Output
-	err    error
+	output       generator.Output
+	preview      generator.Preview
+	previewReady bool
+	err          error
 
 	headerSpring harmonica.Spring
 	headerPos    float64
@@ -168,6 +182,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.step = stepResult
 		m.animateHeader()
 		return m, nil
+	case previewDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.previousStep = stepPreview
+			m.step = stepError
+			return m, nil
+		}
+		m.preview = msg.preview
+		m.previewReady = true
+		m.previewLines = buildPreviewLines(msg.preview, m.blockers)
+		m.previewScroll = 0
+		m.step = stepPreview
+		m.animateHeader()
+		return m, nil
 	case tea.KeyMsg:
 		return m, m.handleKey(msg)
 	}
@@ -196,6 +224,8 @@ func (m model) View() string {
 		content = m.viewServices(stepProxy)
 	case stepReview:
 		content = m.viewReview()
+	case stepPreview:
+		content = m.viewPreview()
 	case stepGenerate:
 		content = m.viewGenerate()
 	case stepResult:
@@ -280,6 +310,17 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 				m.toggleCurrentSelection()
 			}
 		case "enter":
+			if m.step == stepProxy {
+				if err := m.prepareReview(); err != nil {
+					m.err = err
+					m.previousStep = stepProxy
+					m.step = stepError
+					return nil
+				}
+				m.step = stepReview
+				m.animateHeader()
+				return nil
+			}
 			m.step = m.nextStep()
 			m.animateHeader()
 		case "b":
@@ -289,15 +330,53 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 	case stepReview:
 		switch key {
 		case "enter":
-			if len(m.warnings) > 0 {
+			if len(m.blockers) > 0 {
 				return nil
 			}
 			m.step = stepGenerate
 			m.animateHeader()
 			return generateCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
+		case "p":
+			m.previewReady = false
+			m.preview = generator.Preview{}
+			m.previewLines = nil
+			m.previewScroll = 0
+			m.step = stepPreview
+			m.animateHeader()
+			return previewCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
 		case "b":
 			m.step = stepProxy
 			m.animateHeader()
+		}
+	case stepPreview:
+		if key == "b" {
+			m.step = stepReview
+			m.animateHeader()
+			return nil
+		}
+		if !m.previewReady {
+			return nil
+		}
+		switch key {
+		case "up", "k":
+			m.scrollPreview(-1)
+		case "down", "j":
+			m.scrollPreview(1)
+		case "pgup":
+			m.scrollPreview(-m.previewContentHeight())
+		case "pgdown":
+			m.scrollPreview(m.previewContentHeight())
+		case "home":
+			m.previewScroll = 0
+		case "end":
+			m.previewScroll = m.previewMaxScroll()
+		case "enter":
+			if len(m.blockers) > 0 {
+				return nil
+			}
+			m.step = stepGenerate
+			m.animateHeader()
+			return generateCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
 		}
 	case stepGenerate:
 		return nil
@@ -329,6 +408,11 @@ func (m *model) retryFromError() tea.Cmd {
 		m.step = stepGenerate
 		m.animateHeader()
 		return generateCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
+	}
+	if m.previousStep == stepPreview {
+		m.step = stepPreview
+		m.animateHeader()
+		return previewCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
 	}
 	return nil
 }
@@ -390,12 +474,12 @@ func (m model) renderHeader() string {
 	indent := int(4 * m.headerPos)
 	padding := strings.Repeat(" ", indent)
 
-	stepText := fmt.Sprintf("Step %d/10", m.stepIndex())
+	stepText := fmt.Sprintf("Step %d/%d", m.stepIndex(), totalSteps)
 	langText := "language: detecting"
 	if m.langDetected {
 		langText = "language: " + languageLabelWithVersion(m.effectiveDetails())
 	}
-	progress := progressBar(m.stepIndex(), 10, 22)
+	progress := progressBar(m.stepIndex(), totalSteps, 22)
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(titleColor(m.frame))
 	art := titleArt()
@@ -435,10 +519,18 @@ func (m model) footerKeys() string {
 	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
 		return "up/down move | space toggle | enter next | b back | q quit"
 	case stepReview:
-		if len(m.warnings) > 0 {
-			return "resolve warnings to continue | b back | q quit"
+		if len(m.blockers) > 0 {
+			return "resolve blockers to continue | p preview | b back | q quit"
 		}
-		return "enter generate | b back | q quit"
+		return "enter generate | p preview | b back | q quit"
+	case stepPreview:
+		if !m.previewReady {
+			return "preparing preview..."
+		}
+		if len(m.blockers) > 0 {
+			return "up/down scroll | b back | q quit"
+		}
+		return "up/down scroll | enter generate | b back | q quit"
 	case stepGenerate:
 		return "generating..."
 	case stepResult:
@@ -539,11 +631,23 @@ func (m model) viewReview() string {
 		body = append(body, "")
 	}
 
+	files := []string{"- docker-compose.yml", "- Dockerfile"}
+	if m.createDockerignore {
+		files = append(files, "- .dockerignore")
+	}
 	body = append(body,
 		"Files to be generated:",
-		"- docker-compose.yml",
-		"- Dockerfile",
+		strings.Join(files, "\n"),
+		"Existing files are not overwritten.",
 	)
+	if len(m.blockers) > 0 {
+		blockerBlock := []string{
+			"",
+			blockerTitle().Render("Blocking issues"),
+			"- " + strings.Join(m.blockers, "\n- "),
+		}
+		body = append(body, blockerBlock...)
+	}
 	if len(m.warnings) > 0 {
 		warningBlock := []string{
 			"",
@@ -555,18 +659,60 @@ func (m model) viewReview() string {
 	return cardStyle(m.width).Render(sectionTitle("Review") + "\n\n" + strings.Join(body, "\n"))
 }
 
+func (m model) viewPreview() string {
+	if !m.previewReady {
+		line := fmt.Sprintf("%s Preparing preview", m.spinner.View())
+		return cardStyle(m.width).Render(sectionTitle("Preview") + "\n\n" + line)
+	}
+
+	lines := m.previewLines
+	if len(lines) == 0 {
+		lines = buildPreviewLines(m.preview, m.blockers)
+	}
+	contentHeight := m.previewContentHeight()
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	maxScroll := previewMaxScrollFor(len(lines), contentHeight)
+	start := m.previewScroll
+	if start > maxScroll {
+		start = maxScroll
+	}
+	end := start + contentHeight
+	if end > len(lines) {
+		end = len(lines)
+	}
+	visible := lines
+	if len(lines) > 0 {
+		visible = lines[start:end]
+	}
+	lineInfo := fmt.Sprintf("Lines %d-%d of %d", start+1, end, len(lines))
+	if len(lines) == 0 {
+		lineInfo = "No preview available"
+	}
+	body := []string{
+		mutedStyle().Render(lineInfo),
+		"",
+		strings.Join(visible, "\n"),
+	}
+	return cardStyle(m.width).Render(sectionTitle("Preview") + "\n\n" + strings.Join(body, "\n"))
+}
+
 func (m model) viewGenerate() string {
 	line := fmt.Sprintf("%s Generating docker-compose.yml and Dockerfile", m.spinner.View())
 	return cardStyle(m.width).Render(sectionTitle("Generate") + "\n\n" + line)
 }
 
 func (m model) viewResult() string {
+	files := []string{"- " + m.output.ComposePath, "- " + m.output.DockerfilePath}
+	if m.output.DockerignorePath != "" {
+		files = append(files, "- "+m.output.DockerignorePath)
+	}
 	body := []string{
 		successTitle().Render("All set."),
 		"",
 		"Generated files:",
-		"- " + m.output.ComposePath,
-		"- " + m.output.DockerfilePath,
+		strings.Join(files, "\n"),
 		"",
 		"Next steps:",
 		"- docker compose up",
@@ -734,7 +880,6 @@ func (m *model) nextStep() step {
 	case stepAnalytics:
 		return stepProxy
 	case stepProxy:
-		m.warnings = m.validateWarnings()
 		return stepReview
 	default:
 		return m.step
@@ -781,12 +926,14 @@ func (m model) stepIndex() int {
 		return 8
 	case stepReview:
 		return 9
+	case stepPreview:
+		return 10
 	case stepGenerate:
-		return 10
+		return 11
 	case stepResult:
-		return 10
+		return 11
 	case stepError:
-		return 10
+		return 11
 	default:
 		return 1
 	}
@@ -796,6 +943,28 @@ func detectCmd(root string) tea.Cmd {
 	return func() tea.Msg {
 		details, err := generator.DetectLanguage(root)
 		return detectDoneMsg{details: details, err: err}
+	}
+}
+
+func previewCmd(root string, services []string, overrideLang bool, overrideType generator.Language) tea.Cmd {
+	return func() tea.Msg {
+		lang, err := generator.DetectLanguage(root)
+		if err != nil {
+			return previewDoneMsg{err: err}
+		}
+		if overrideLang {
+			lang.Type = overrideType
+		}
+		dockerfile, err := generator.Dockerfile(lang)
+		if err != nil {
+			return previewDoneMsg{err: err}
+		}
+		compose, err := generator.Compose(root, generator.ComposeSelection{Services: services})
+		if err != nil {
+			return previewDoneMsg{err: err}
+		}
+		preview, err := generator.PreviewFiles(root, compose, dockerfile)
+		return previewDoneMsg{preview: preview, err: err}
 	}
 }
 
@@ -898,17 +1067,113 @@ func languageLabelWithVersion(details generator.LanguageDetails) string {
 	return base + " " + version
 }
 
-func (m model) validateWarnings() []string {
-	warnings := []string{}
+func buildPreviewLines(preview generator.Preview, blockers []string) []string {
+	lines := []string{}
+	lines = appendPreviewBlock(lines, generator.ComposeFileName, preview.Compose, true)
+	lines = append(lines, "")
+	lines = appendPreviewBlock(lines, generator.DockerfileFileName, preview.Dockerfile, true)
+	lines = append(lines, "")
+	showDockerignore := preview.Dockerignore.Status != generator.FileStatusExists
+	lines = appendPreviewBlock(lines, generator.DockerignoreFileName, preview.Dockerignore, showDockerignore)
+	if len(blockers) > 0 {
+		lines = append(lines, "", "Blocking issues:")
+		for _, blocker := range blockers {
+			lines = append(lines, "- "+blocker)
+		}
+	}
+	return lines
+}
+
+func appendPreviewBlock(lines []string, name string, preview generator.FilePreview, showContent bool) []string {
+	status := previewStatusLabel(preview.Status)
+	lines = append(lines, fmt.Sprintf("%s (%s)", name, status))
+	if showContent && preview.Content != "" {
+		lines = append(lines, "  ---")
+		lines = append(lines, indentLines(preview.Content, "  ")...)
+		return lines
+	}
+	if preview.Status == generator.FileStatusExists {
+		lines = append(lines, "  existing file will be kept")
+	}
+	return lines
+}
+
+func clampInt(value int, min int, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+func previewMaxScrollFor(totalLines int, contentHeight int) int {
+	if contentHeight <= 0 {
+		return 0
+	}
+	if totalLines <= contentHeight {
+		return 0
+	}
+	return totalLines - contentHeight
+}
+
+func (m *model) prepareReview() error {
+	selection := generator.ComposeSelection{Services: selectedServiceIDs(m.services, m.selected)}
+	warnings, err := generator.SelectionWarnings(m.root, selection)
+	if err != nil {
+		return err
+	}
+
+	blockers := []string{}
 	composePath := filepath.Join(m.root, generator.ComposeFileName)
 	dockerfilePath := filepath.Join(m.root, generator.DockerfileFileName)
 	if fileExists(composePath) {
-		warnings = append(warnings, "docker-compose.yml already exists")
+		blockers = append(blockers, "docker-compose.yml already exists")
 	}
 	if fileExists(dockerfilePath) {
-		warnings = append(warnings, "Dockerfile already exists")
+		blockers = append(blockers, "Dockerfile already exists")
 	}
-	return warnings
+
+	m.warnings = warnings
+	m.blockers = blockers
+	m.createDockerignore = !fileExists(filepath.Join(m.root, generator.DockerignoreFileName))
+	m.previewReady = false
+	m.preview = generator.Preview{}
+	m.previewLines = nil
+	m.previewScroll = 0
+	return nil
+}
+
+func (m *model) scrollPreview(delta int) {
+	if delta == 0 {
+		return
+	}
+	maxScroll := m.previewMaxScroll()
+	if maxScroll == 0 {
+		m.previewScroll = 0
+		return
+	}
+	m.previewScroll = clampInt(m.previewScroll+delta, 0, maxScroll)
+}
+
+func (m *model) previewMaxScroll() int {
+	contentHeight := m.previewContentHeight()
+	return previewMaxScrollFor(len(m.previewLines), contentHeight)
+}
+
+func (m *model) previewContentHeight() int {
+	if m.height <= 0 {
+		return 12
+	}
+	headerHeight := lipgloss.Height(m.renderHeader())
+	footerHeight := lipgloss.Height(m.renderFooter())
+	available := m.height - headerHeight - footerHeight - 6
+	available -= 2
+	if available < 6 {
+		return 6
+	}
+	return available
 }
 
 func fileExists(path string) bool {
@@ -995,6 +1260,10 @@ func serviceLineStyle(active bool, selected bool) lipgloss.Style {
 	return style
 }
 
+func blockerTitle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(paletteRed)
+}
+
 func warningTitle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(paletteYellow)
 }
@@ -1028,6 +1297,29 @@ func progressBar(current, total, width int) string {
 	}
 	bar := strings.Repeat("=", filled) + strings.Repeat("-", width-filled)
 	return "[" + bar + "]"
+}
+
+func previewStatusLabel(status generator.FileStatus) string {
+	switch status {
+	case generator.FileStatusNew:
+		return "new"
+	case generator.FileStatusSame:
+		return "matches existing"
+	case generator.FileStatusDifferent:
+		return "differs from existing"
+	case generator.FileStatusExists:
+		return "exists"
+	default:
+		return string(status)
+	}
+}
+
+func indentLines(value string, indent string) []string {
+	lines := strings.Split(value, "\n")
+	for i := range lines {
+		lines[i] = indent + lines[i]
+	}
+	return lines
 }
 
 func titleArt() []string {
