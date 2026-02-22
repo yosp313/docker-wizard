@@ -1,31 +1,21 @@
 # Knowledge Base
 
-## Project overview
+## Purpose
 - Product: TUI scaffold generator for Docker images and docker-compose
 - Goal: let users select services and auto-generate a `docker-compose.yml` plus a project-specific `Dockerfile`
 - Primary users: developers bootstrapping local dev stacks
 
-## Technology stack
-- Language: Go
-- TUI: Bubble Tea, Bubbles, Huh, Lip Gloss, Harmonica
-
-## Core features
+## Current scope
 - Service selection UI for compose generation
 - Generate `docker-compose.yml` with the chosen services
 - Detect the main project language
 - Generate a matching `Dockerfile`
 - Add the generated app service into `docker-compose.yml`
+- Deterministic output and no overwrite of existing files
 
-## Initial service catalog
-- MySQL
-- PostgreSQL
-- Redis
-- Analytics tool
-- Nginx
-- Traefik
-- Caddy
-- RabbitMQ
-- Kafka
+## Technology stack
+- Language: Go
+- TUI: Bubble Tea, Bubbles, Huh, Lip Gloss, Harmonica
 
 ## Engineering principles
 - KISS, SOLID, DRY
@@ -33,7 +23,7 @@
 - Keep file organization simple and readable
 
 ## Defaults and conventions
-### Compose structure
+### Compose output
 - Compose version: 3.9
 - Base services include an `app` service with `build.context: .` and `dockerfile: Dockerfile`
 - Default app port mapping: `8080:8080`
@@ -42,8 +32,9 @@
 - Services share the `app-net` network
 - Volumes: declared for mysql, postgres, and caddy when selected
 
-### Service defaults
-Defaults are defined in `config/services.json` and can be edited there.
+### Service catalog
+- Defaults live in `config/services.json` and can be edited there
+- Services declare categories, dependencies, and public exposure
 
 ### Service catalog additions
 - MongoDB (database)
@@ -61,8 +52,7 @@ Defaults are defined in `config/services.json` and can be edited there.
 - Fallback: `alpine:3.20`
 
 ## Detection rules
-### Language detection
-Priority order:
+### Language detection priority
 1. Go: `go.mod`
 2. Node: `package.json` (detects package manager via lock file)
 3. Python: `requirements.txt`, `pyproject.toml`, or `Pipfile`
@@ -81,7 +71,7 @@ Priority order:
 - Java: `pom.xml` (`maven.compiler.release/source` or `java.version`), or Gradle toolchain/source compatibility
 - .NET: `global.json` SDK version
 
-## UX flow (TBD)
+## UX flow
 ### Wizard flow
 - Welcome
 - Detect language
@@ -94,19 +84,8 @@ Priority order:
 - Review and generate
 - Result
 
-## Extensibility (TBD)
-- How to add a new service
-- How to add a new language template
-
-## Testing (TBD)
-- Unit tests for generation logic
-- Fixture projects for language detection
-- Snapshot tests for compose/Dockerfile output
-
-## Non-goals (TBD)
-- No deployment or cloud orchestration
-- No container runtime management beyond compose generation
-
-## Distribution (TBD)
-- Release artifacts and install method
-- Supported OS/terminal constraints
+## Planned / TBD
+- Extensibility: how to add a new service or language template
+- Testing: unit tests, fixture projects, and snapshot tests
+- Non-goals: no deployment or cloud orchestration
+- Distribution: releases, install method, and supported OS/terminal constraints
