@@ -8,7 +8,7 @@ Docker Wizard is a Go TUI that scaffolds a Docker development stack for your pro
 - Category-based service selection (databases, queues, cache, analytics, proxies)
 - Config-driven service catalog (edit `config/services.json`)
 - Deterministic, reproducible compose output
-- Safe file generation that avoids overwriting existing files
+- Safe file generation with merge mode (creates missing files and merges differing existing files)
 
 ## Quick start
 ```bash
@@ -53,6 +53,12 @@ docker-wizard --version
 - `docker-compose.yml`
 - `.dockerignore` (only if missing)
 
+When generated files already exist:
+- Matching files are left as-is
+- Differing files are merged with generated output
+- Original differing files are backed up as `*.bak`
+- The result screen reports `created`, `updated`, or `unchanged` per file
+
 ## Releases
 - Every push to `main` runs CI (`gofmt` check, `go vet`, `go test`, `go build`).
 - If CI passes on `main`, the pipeline auto-tags the commit with the next patch (`vX.Y.Z`) and publishes a GitHub Release.
@@ -70,7 +76,13 @@ docker-wizard --version
 - Services are sorted for stable diffs.
 - Volumes are declared when required by a service.
 - Only services marked `public` in `config/services.json` publish host ports.
-- Existing files are never overwritten.
+- Existing identical files are left unchanged.
+- Existing differing files are merged and backed up as `*.bak`.
+
+## Dockerfile defaults
+- Generated templates set `APP_START_CMD` and run `CMD ["sh", "-lc", "$APP_START_CMD"]`.
+- Node uses `npm ci` when `package-lock.json` exists, otherwise `npm install`.
+- Java and .NET templates use multi-stage builds by default.
 
 ## Development
 ```bash

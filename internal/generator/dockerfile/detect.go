@@ -45,6 +45,7 @@ type LanguageDetails struct {
 	PHPVersion      string
 	JavaVersion     string
 	DotNetVersion   string
+	DotNetProject   string
 }
 
 func DetectLanguage(root string) (LanguageDetails, error) {
@@ -80,6 +81,9 @@ func DetectLanguage(root string) (LanguageDetails, error) {
 		return LanguageDetails{}, fmt.Errorf("detect .csproj: %w", err)
 	}
 	details.HasCSProj = len(csproj) > 0
+	if len(csproj) > 0 {
+		details.DotNetProject = trimExt(filepath.Base(csproj[0]))
+	}
 
 	details.GoVersion = detectGoVersion(root)
 	details.NodeVersion = detectNodeVersion(root)
@@ -117,4 +121,12 @@ func fileExists(path string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func trimExt(name string) string {
+	ext := filepath.Ext(name)
+	if ext == "" {
+		return name
+	}
+	return name[:len(name)-len(ext)]
 }

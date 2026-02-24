@@ -13,6 +13,7 @@ type Language = dockerfile.Language
 type LanguageDetails = dockerfile.LanguageDetails
 type ServiceSpec = catalog.ServiceSpec
 type Output = write.Output
+type WriteStatus = write.WriteStatus
 type Preview = preview.Preview
 type FilePreview = preview.FilePreview
 type FileStatus = preview.FileStatus
@@ -33,6 +34,12 @@ const (
 	ComposeFileName      = write.ComposeFileName
 	DockerfileFileName   = write.DockerfileFileName
 	DockerignoreFileName = write.DockerignoreFileName
+)
+
+const (
+	WriteStatusCreated   = write.WriteStatusCreated
+	WriteStatusUpdated   = write.WriteStatusUpdated
+	WriteStatusUnchanged = write.WriteStatusUnchanged
 )
 
 const (

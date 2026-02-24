@@ -11,7 +11,7 @@
 - Detect the main project language
 - Generate a matching `Dockerfile`
 - Add the generated app service into `docker-compose.yml`
-- Deterministic output and no overwrite of existing files
+- Deterministic output and merge write mode for existing files
 
 ## Technology stack
 - Language: Go
@@ -43,13 +43,21 @@
 
 ### Dockerfile templates
 - Go: multi-stage build from `golang:1.25-alpine` to `alpine:3.20`
-- Node: `node:20-alpine` with npm/yarn/pnpm auto-detection
+- Node: `node:20-alpine` with npm/yarn/pnpm auto-detection (`npm ci` when `package-lock.json` exists)
 - Python: `python:3.12-slim`, optional requirements install
 - Ruby: `ruby:3.3-alpine` with bundler
 - PHP: `php:8.3-fpm-alpine`
-- Java: `eclipse-temurin:21-jre`
-- .NET: `mcr.microsoft.com/dotnet/aspnet:8.0`
+- Java: multi-stage build (Maven/Gradle builder to `eclipse-temurin:21-jre` runtime)
+- .NET: multi-stage build (`dotnet/sdk` builder to `dotnet/aspnet` runtime)
 - Fallback: `alpine:3.20`
+- All templates set `APP_START_CMD` and run through `sh -lc` for command override support
+
+### File write behavior
+- New files are created
+- Existing identical files are marked unchanged
+- Existing differing files are merged and marked updated
+- Existing differing file contents are backed up to `*.bak`
+- `.dockerignore` is created only when missing
 
 ## Detection rules
 ### Language detection priority

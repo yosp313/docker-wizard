@@ -44,7 +44,7 @@ func dockerfileGo(details LanguageDetails) string {
 		"WORKDIR /app\n" +
 		"COPY --from=build /out/app /app/app\n" +
 		"EXPOSE 8080\n" +
-		"CMD [\"/app/app\"]\n"
+		startCommandBlock("/app/app")
 }
 
 func dockerfileNode(details LanguageDetails) string {
@@ -65,6 +65,7 @@ func dockerfileNode(details LanguageDetails) string {
 		lockCopy = "COPY pnpm-lock.yaml ./\n"
 		corepack = "RUN corepack enable\n"
 	} else if details.HasPackageLock {
+		installCmd = "npm ci"
 		lockCopy = "COPY package-lock.json ./\n"
 	}
 
@@ -77,7 +78,7 @@ func dockerfileNode(details LanguageDetails) string {
 		"RUN " + installCmd + "\n" +
 		"COPY . .\n" +
 		"EXPOSE 8080\n" +
-		"CMD [\"" + splitCmd(startCmd)[0] + "\"" + joinCmdArgs(startCmd) + "]\n"
+		startCommandBlock(startCmd)
 }
 
 func dockerfilePython(details LanguageDetails) string {
@@ -94,7 +95,7 @@ func dockerfilePython(details LanguageDetails) string {
 		install +
 		copy +
 		"EXPOSE 8080\n" +
-		"CMD [\"python\", \"main.py\"]\n"
+		startCommandBlock("python main.py")
 }
 
 func dockerfileRuby(details LanguageDetails) string {
@@ -114,7 +115,7 @@ func dockerfileRuby(details LanguageDetails) string {
 		install +
 		"COPY . .\n" +
 		"EXPOSE 8080\n" +
-		"CMD [\"ruby\", \"app.rb\"]\n"
+		startCommandBlock("ruby app.rb")
 }
 
 func dockerfilePHP(details LanguageDetails) string {
@@ -130,27 +131,65 @@ func dockerfilePHP(details LanguageDetails) string {
 		composerCopy +
 		"COPY . .\n" +
 		"EXPOSE 8080\n" +
-		"CMD [\"php\", \"-S\", \"0.0.0.0:8080\", \"-t\", \"public\"]\n"
+		startCommandBlock("php -S 0.0.0.0:8080 -t public")
 }
 
 func dockerfileJava(details LanguageDetails) string {
 	javaVersion := versionOrDefault(details.JavaVersion, "21")
+
+	buildStage := ""
+	if details.HasPomXML {
+		buildStage = "" +
+			"FROM maven:3.9-eclipse-temurin-" + javaVersion + " AS build\n" +
+			"WORKDIR /src\n" +
+			"COPY pom.xml ./\n" +
+			"RUN mvn -q -DskipTests dependency:go-offline || true\n" +
+			"COPY . .\n" +
+			"RUN mvn -q -DskipTests package && mkdir -p /out && cp \"$(find target -maxdepth 1 -type f -name '*.jar' | head -n 1)\" /out/app.jar\n"
+	} else if details.HasGradle || details.HasGradleKts {
+		buildStage = "" +
+			"FROM gradle:8-jdk" + javaVersion + " AS build\n" +
+			"WORKDIR /src\n" +
+			"COPY . .\n" +
+			"RUN if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew build -x test; else gradle build -x test; fi && mkdir -p /out && cp \"$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)\" /out/app.jar\n"
+	} else {
+		buildStage = "" +
+			"FROM eclipse-temurin:" + javaVersion + "-jre AS build\n" +
+			"WORKDIR /src\n" +
+			"COPY . .\n" +
+			"RUN mkdir -p /out && if [ -f app.jar ]; then cp app.jar /out/app.jar; fi\n"
+	}
+
 	return "" +
+		buildStage +
+		"\n" +
 		"FROM eclipse-temurin:" + javaVersion + "-jre\n" +
 		"WORKDIR /app\n" +
-		"COPY . .\n" +
+		"COPY --from=build /out/app.jar /app/app.jar\n" +
 		"EXPOSE 8080\n" +
-		"CMD [\"java\", \"-jar\", \"app.jar\"]\n"
+		startCommandBlock("java -jar /app/app.jar")
 }
 
 func dockerfileDotNet(details LanguageDetails) string {
 	dotnetVersion := versionOrDefault(details.DotNetVersion, "8.0")
+	entryDll := "app.dll"
+	if details.DotNetProject != "" {
+		entryDll = details.DotNetProject + ".dll"
+	}
+
 	return "" +
+		"FROM mcr.microsoft.com/dotnet/sdk:" + dotnetVersion + " AS build\n" +
+		"WORKDIR /src\n" +
+		"COPY *.csproj ./\n" +
+		"RUN dotnet restore || true\n" +
+		"COPY . .\n" +
+		"RUN dotnet publish -c Release -o /out\n" +
+		"\n" +
 		"FROM mcr.microsoft.com/dotnet/aspnet:" + dotnetVersion + "\n" +
 		"WORKDIR /app\n" +
-		"COPY . .\n" +
+		"COPY --from=build /out/ ./\n" +
 		"EXPOSE 8080\n" +
-		"CMD [\"dotnet\", \"app.dll\"]\n"
+		startCommandBlock("dotnet /app/"+entryDll)
 }
 
 func dockerfileGeneric() string {
@@ -158,11 +197,7 @@ func dockerfileGeneric() string {
 		"FROM alpine:3.20\n" +
 		"WORKDIR /app\n" +
 		"COPY . .\n" +
-		"CMD [\"sh\"]\n"
-}
-
-func splitCmd(cmd string) []string {
-	return splitWords(cmd)
+		startCommandBlock("sh")
 }
 
 func versionOrDefault(value string, fallback string) string {
@@ -172,34 +207,8 @@ func versionOrDefault(value string, fallback string) string {
 	return value
 }
 
-func joinCmdArgs(cmd string) string {
-	parts := splitWords(cmd)
-	if len(parts) <= 1 {
-		return ""
-	}
-
-	out := ""
-	for _, part := range parts[1:] {
-		out += ", \"" + part + "\""
-	}
-	return out
-}
-
-func splitWords(value string) []string {
-	var parts []string
-	current := ""
-	for _, r := range value {
-		if r == ' ' {
-			if current != "" {
-				parts = append(parts, current)
-				current = ""
-			}
-			continue
-		}
-		current += string(r)
-	}
-	if current != "" {
-		parts = append(parts, current)
-	}
-	return parts
+func startCommandBlock(defaultCommand string) string {
+	return "" +
+		"ENV APP_START_CMD=\"" + defaultCommand + "\"\n" +
+		"CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]\n"
 }

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestWriteFilesSuccess(t *testing.T) {
+func TestWriteFilesCreatesMissingFiles(t *testing.T) {
 	root := t.TempDir()
 	compose := "version: \"3.9\"\nservices:\n"
 	dockerfile := "FROM alpine:3.20\n"
@@ -19,6 +19,7 @@ func TestWriteFilesSuccess(t *testing.T) {
 
 	composePath := filepath.Join(root, ComposeFileName)
 	dockerfilePath := filepath.Join(root, DockerfileFileName)
+	dockerignorePath := filepath.Join(root, DockerignoreFileName)
 
 	if out.ComposePath != composePath {
 		t.Fatalf("unexpected compose path: %s", out.ComposePath)
@@ -26,8 +27,18 @@ func TestWriteFilesSuccess(t *testing.T) {
 	if out.DockerfilePath != dockerfilePath {
 		t.Fatalf("unexpected dockerfile path: %s", out.DockerfilePath)
 	}
-	if out.DockerignorePath == "" {
-		t.Fatal("expected dockerignore path to be set")
+	if out.DockerignorePath != dockerignorePath {
+		t.Fatalf("unexpected dockerignore path: %s", out.DockerignorePath)
+	}
+
+	if out.ComposeStatus != WriteStatusCreated {
+		t.Fatalf("expected compose status created, got %s", out.ComposeStatus)
+	}
+	if out.DockerfileStatus != WriteStatusCreated {
+		t.Fatalf("expected dockerfile status created, got %s", out.DockerfileStatus)
+	}
+	if out.DockerignoreStatus != WriteStatusCreated {
+		t.Fatalf("expected dockerignore status created, got %s", out.DockerignoreStatus)
 	}
 
 	composeBytes, err := os.ReadFile(composePath)
@@ -47,30 +58,136 @@ func TestWriteFilesSuccess(t *testing.T) {
 	}
 }
 
-func TestWriteFilesRollsBackComposeWhenDockerfileMoveFails(t *testing.T) {
+func TestWriteFilesMergesDifferingExistingFiles(t *testing.T) {
 	root := t.TempDir()
-	if err := os.Mkdir(filepath.Join(root, DockerfileFileName), 0o755); err != nil {
-		t.Fatalf("create dockerfile directory: %v", err)
+	composePath := filepath.Join(root, ComposeFileName)
+	dockerfilePath := filepath.Join(root, DockerfileFileName)
+	existingCompose := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  custom:\n" +
+		"    image: busybox\n" +
+		"    command:\n" +
+		"      - sleep\n" +
+		"      - \"3600\"\n"
+	if err := os.WriteFile(composePath, []byte(existingCompose), 0o644); err != nil {
+		t.Fatalf("write existing compose: %v", err)
 	}
 
-	_, err := WriteFiles(root, "services:\n", "FROM alpine\n")
-	if err == nil {
-		t.Fatal("expected an error")
-	}
-	if !strings.Contains(err.Error(), "move dockerfile into place") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	_, statErr := os.Stat(filepath.Join(root, ComposeFileName))
-	if !os.IsNotExist(statErr) {
-		t.Fatalf("expected compose file to be rolled back, got stat err: %v", statErr)
+	existingDockerfile := "" +
+		"FROM alpine:3.20\n" +
+		"WORKDIR /app\n" +
+		"COPY . .\n" +
+		"CMD [\"./run.sh\"]\n"
+	if err := os.WriteFile(dockerfilePath, []byte(existingDockerfile), 0o644); err != nil {
+		t.Fatalf("write existing dockerfile: %v", err)
 	}
 
-	info, statErr := os.Stat(filepath.Join(root, DockerfileFileName))
-	if statErr != nil {
-		t.Fatalf("expected dockerfile directory to remain: %v", statErr)
+	generatedCompose := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    image: app:latest\n" +
+		"networks:\n" +
+		"  app-net:\n"
+	generatedDockerfile := "" +
+		"FROM alpine:3.20\n" +
+		"WORKDIR /app\n" +
+		"COPY . .\n" +
+		"ENV APP_START_CMD=\"/app/app\"\n" +
+		"CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]\n"
+
+	out, err := WriteFiles(root, generatedCompose, generatedDockerfile)
+	if err != nil {
+		t.Fatalf("write files: %v", err)
 	}
-	if !info.IsDir() {
-		t.Fatalf("expected dockerfile path to remain a directory")
+
+	if out.ComposeStatus != WriteStatusUpdated {
+		t.Fatalf("expected compose updated, got %s", out.ComposeStatus)
+	}
+	if out.DockerfileStatus != WriteStatusUpdated {
+		t.Fatalf("expected dockerfile updated, got %s", out.DockerfileStatus)
+	}
+	if out.ComposeBackupPath == "" {
+		t.Fatal("expected compose backup path")
+	}
+	if out.DockerfileBackupPath == "" {
+		t.Fatal("expected dockerfile backup path")
+	}
+
+	composeBytes, err := os.ReadFile(composePath)
+	if err != nil {
+		t.Fatalf("read compose: %v", err)
+	}
+	mergedCompose := string(composeBytes)
+	if !strings.Contains(mergedCompose, "custom:") {
+		t.Fatalf("expected merged compose to keep existing custom service")
+	}
+	if !strings.Contains(mergedCompose, "app:") {
+		t.Fatalf("expected merged compose to add generated app service")
+	}
+	if !strings.Contains(mergedCompose, "app-net:") {
+		t.Fatalf("expected merged compose to add generated network")
+	}
+
+	dockerfileBytes, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("read dockerfile: %v", err)
+	}
+	mergedDockerfile := string(dockerfileBytes)
+	if !strings.Contains(mergedDockerfile, "CMD [\"./run.sh\"]") {
+		t.Fatalf("expected merged Dockerfile to keep existing command")
+	}
+	if !strings.Contains(mergedDockerfile, "ENV APP_START_CMD=") {
+		t.Fatalf("expected merged Dockerfile to include APP_START_CMD")
+	}
+	if strings.Contains(mergedDockerfile, "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]") {
+		t.Fatalf("expected merged Dockerfile to preserve existing CMD without adding another CMD")
+	}
+
+	composeBackupBytes, err := os.ReadFile(out.ComposeBackupPath)
+	if err != nil {
+		t.Fatalf("read compose backup: %v", err)
+	}
+	if string(composeBackupBytes) != existingCompose {
+		t.Fatalf("expected compose backup to contain original content")
+	}
+
+	dockerfileBackupBytes, err := os.ReadFile(out.DockerfileBackupPath)
+	if err != nil {
+		t.Fatalf("read dockerfile backup: %v", err)
+	}
+	if string(dockerfileBackupBytes) != existingDockerfile {
+		t.Fatalf("expected dockerfile backup to contain original content")
+	}
+}
+
+func TestWriteFilesMarksUnchangedFiles(t *testing.T) {
+	root := t.TempDir()
+	compose := "services:\n"
+	dockerfile := "FROM alpine\n"
+	if err := os.WriteFile(filepath.Join(root, ComposeFileName), []byte(compose), 0o644); err != nil {
+		t.Fatalf("write compose: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, DockerfileFileName), []byte(dockerfile), 0o644); err != nil {
+		t.Fatalf("write dockerfile: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, DockerignoreFileName), []byte(DefaultDockerignore()), 0o644); err != nil {
+		t.Fatalf("write dockerignore: %v", err)
+	}
+
+	out, err := WriteFiles(root, compose, dockerfile)
+	if err != nil {
+		t.Fatalf("write files: %v", err)
+	}
+
+	if out.ComposeStatus != WriteStatusUnchanged {
+		t.Fatalf("expected compose unchanged, got %s", out.ComposeStatus)
+	}
+	if out.DockerfileStatus != WriteStatusUnchanged {
+		t.Fatalf("expected dockerfile unchanged, got %s", out.DockerfileStatus)
+	}
+	if out.DockerignoreStatus != WriteStatusUnchanged {
+		t.Fatalf("expected dockerignore unchanged, got %s", out.DockerignoreStatus)
 	}
 }
