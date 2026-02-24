@@ -24,9 +24,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
       - name: Create and push tag
         env:
           TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+          TAG_PUSH_TOKEN: ${{ secrets.RELEASE_PAT }}
+          REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -49,7 +52,15 @@ jobs:
 
           git tag "$new_tag" "$TARGET_SHA"
 
-          if git push origin "$new_tag"; then
+          if [ -z "${TAG_PUSH_TOKEN}" ]; then
+            printf '%s\n' "Missing required secret RELEASE_PAT for tag push." >&2
+            printf '%s\n' "Configure RELEASE_PAT with repository write access so tag pushes trigger Release workflow." >&2
+            exit 1
+          fi
+
+          push_url="https://x-access-token:${TAG_PUSH_TOKEN}@github.com/${REPOSITORY}.git"
+
+          if git push "$push_url" "$new_tag"; then
             printf '%s\n' "Pushed $new_tag"
             exit 0
           fi

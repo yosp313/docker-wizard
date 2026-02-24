@@ -55,6 +55,7 @@ docker-wizard --version
 ## Releases
 - Every push to `main` runs CI (`gofmt` check, `go vet`, `go test`, `go build`).
 - If CI passes on `main`, the pipeline auto-tags the commit with the next patch (`vX.Y.Z`) and publishes a GitHub Release.
+- Auto-tag uses a repository secret `RELEASE_PAT` (with repository contents write access) so tag pushes trigger the `Release` workflow.
 - Tags use `vX.Y.Z` and start at `v0.1.0` if no tags exist.
 
 ## Configuration
