@@ -3,8 +3,10 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -74,5 +76,31 @@ func TestRetryFromErrorProxyKeepsErrorStepOnFailure(t *testing.T) {
 	}
 	if m.err == nil {
 		t.Fatal("expected error to be set")
+	}
+}
+
+func TestHandleKey_PreviewHomeAndEnd(t *testing.T) {
+	content := strings.Join([]string{
+		"1", "2", "3", "4", "5", "6", "7", "8",
+	}, "\n")
+
+	m := model{
+		step:         stepPreview,
+		previewReady: true,
+		previewViewport: viewport.Model{
+			Width:  10,
+			Height: 3,
+		},
+	}
+	m.previewViewport.SetContent(content)
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnd})
+	if m.previewViewport.YOffset == 0 {
+		t.Fatal("expected preview offset to move to bottom")
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyHome})
+	if m.previewViewport.YOffset != 0 {
+		t.Fatalf("expected preview offset at top, got %d", m.previewViewport.YOffset)
 	}
 }

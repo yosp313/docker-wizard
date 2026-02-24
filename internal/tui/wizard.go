@@ -10,6 +10,7 @@ import (
 	"docker-wizard/internal/generator"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/harmonica"
 	"github.com/charmbracelet/lipgloss"
@@ -93,8 +94,8 @@ type model struct {
 	warnings           []string
 	blockers           []string
 	createDockerignore bool
-	previewLines       []string
-	previewScroll      int
+	previewContent     string
+	previewViewport    viewport.Model
 	frame              int
 
 	output       generator.Output
@@ -148,6 +149,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.syncPreviewViewportSize()
 		return m, nil
 	case tickMsg:
 		m.frame++
@@ -191,8 +193,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.preview = msg.preview
 		m.previewReady = true
-		m.previewLines = buildPreviewLines(msg.preview, m.blockers)
-		m.previewScroll = 0
+		m.previewContent = strings.Join(buildPreviewLines(msg.preview, m.blockers), "\n")
+		m.setPreviewViewportContent(m.previewContent)
 		m.step = stepPreview
 		m.animateHeader()
 		return m, nil
@@ -340,8 +342,8 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		case "p":
 			m.previewReady = false
 			m.preview = generator.Preview{}
-			m.previewLines = nil
-			m.previewScroll = 0
+			m.previewContent = ""
+			m.setPreviewViewportContent("")
 			m.step = stepPreview
 			m.animateHeader()
 			return previewCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
@@ -359,18 +361,12 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		switch key {
-		case "up", "k":
-			m.scrollPreview(-1)
-		case "down", "j":
-			m.scrollPreview(1)
-		case "pgup":
-			m.scrollPreview(-m.previewContentHeight())
-		case "pgdown":
-			m.scrollPreview(m.previewContentHeight())
 		case "home":
-			m.previewScroll = 0
+			m.previewViewport.GotoTop()
+			return nil
 		case "end":
-			m.previewScroll = m.previewMaxScroll()
+			m.previewViewport.GotoBottom()
+			return nil
 		case "enter":
 			if len(m.blockers) > 0 {
 				return nil
@@ -379,6 +375,9 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			m.animateHeader()
 			return generateCmd(m.root, selectedServiceIDs(m.services, m.selected), m.overrideLang, m.overrideType)
 		}
+		var cmd tea.Cmd
+		m.previewViewport, cmd = m.previewViewport.Update(msg)
+		return cmd
 	case stepGenerate:
 		return nil
 	case stepResult:
@@ -677,35 +676,30 @@ func (m model) viewPreview() string {
 		return cardStyle(m.width).Render(sectionTitle("Preview") + "\n\n" + line)
 	}
 
-	lines := m.previewLines
-	if len(lines) == 0 {
-		lines = buildPreviewLines(m.preview, m.blockers)
+	content := m.previewContent
+	if content == "" {
+		content = strings.Join(buildPreviewLines(m.preview, m.blockers), "\n")
 	}
-	contentHeight := m.previewContentHeight()
-	if contentHeight < 1 {
-		contentHeight = 1
-	}
-	maxScroll := previewMaxScrollFor(len(lines), contentHeight)
-	start := m.previewScroll
-	if start > maxScroll {
-		start = maxScroll
-	}
-	end := start + contentHeight
-	if end > len(lines) {
-		end = len(lines)
-	}
-	visible := lines
-	if len(lines) > 0 {
-		visible = lines[start:end]
-	}
-	lineInfo := fmt.Sprintf("Lines %d-%d of %d", start+1, end, len(lines))
-	if len(lines) == 0 {
+
+	totalLines := lineCount(content)
+	lineInfo := ""
+	if totalLines == 0 {
 		lineInfo = "No preview available"
+	} else {
+		start := m.previewViewport.YOffset + 1
+		end := m.previewViewport.YOffset + m.previewViewport.Height
+		if end > totalLines {
+			end = totalLines
+		}
+		if start > end {
+			start = end
+		}
+		lineInfo = fmt.Sprintf("Lines %d-%d of %d", start, end, totalLines)
 	}
 	body := []string{
 		mutedStyle().Render(lineInfo),
 		"",
-		strings.Join(visible, "\n"),
+		m.previewViewport.View(),
 	}
 	return cardStyle(m.width).Render(sectionTitle("Preview") + "\n\n" + strings.Join(body, "\n"))
 }
@@ -1116,26 +1110,6 @@ func appendPreviewBlock(lines []string, name string, preview generator.FilePrevi
 	return lines
 }
 
-func clampInt(value int, min int, max int) int {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
-}
-
-func previewMaxScrollFor(totalLines int, contentHeight int) int {
-	if contentHeight <= 0 {
-		return 0
-	}
-	if totalLines <= contentHeight {
-		return 0
-	}
-	return totalLines - contentHeight
-}
-
 func (m *model) prepareReview() error {
 	selection := generator.ComposeSelection{Services: selectedServiceIDs(m.services, m.selected)}
 	warnings, err := generator.SelectionWarnings(m.root, selection)
@@ -1158,26 +1132,9 @@ func (m *model) prepareReview() error {
 	m.createDockerignore = !fileExists(filepath.Join(m.root, generator.DockerignoreFileName))
 	m.previewReady = false
 	m.preview = generator.Preview{}
-	m.previewLines = nil
-	m.previewScroll = 0
+	m.previewContent = ""
+	m.setPreviewViewportContent("")
 	return nil
-}
-
-func (m *model) scrollPreview(delta int) {
-	if delta == 0 {
-		return
-	}
-	maxScroll := m.previewMaxScroll()
-	if maxScroll == 0 {
-		m.previewScroll = 0
-		return
-	}
-	m.previewScroll = clampInt(m.previewScroll+delta, 0, maxScroll)
-}
-
-func (m *model) previewMaxScroll() int {
-	contentHeight := m.previewContentHeight()
-	return previewMaxScrollFor(len(m.previewLines), contentHeight)
 }
 
 func (m *model) previewContentHeight() int {
@@ -1192,6 +1149,42 @@ func (m *model) previewContentHeight() int {
 		return 6
 	}
 	return available
+}
+
+func (m *model) previewContentWidth() int {
+	if m.width <= 0 {
+		return 80
+	}
+	available := m.width - 10
+	if available < 20 {
+		return 20
+	}
+	return available
+}
+
+func (m *model) setPreviewViewportContent(content string) {
+	if m.previewViewport.Width == 0 && m.previewViewport.Height == 0 {
+		m.previewViewport = viewport.New(m.previewContentWidth(), m.previewContentHeight())
+	} else {
+		m.syncPreviewViewportSize()
+	}
+	m.previewViewport.SetContent(content)
+	m.previewViewport.GotoTop()
+}
+
+func (m *model) syncPreviewViewportSize() {
+	if m.previewViewport.Width == 0 && m.previewViewport.Height == 0 {
+		return
+	}
+	m.previewViewport.Width = m.previewContentWidth()
+	m.previewViewport.Height = m.previewContentHeight()
+}
+
+func lineCount(content string) int {
+	if content == "" {
+		return 0
+	}
+	return strings.Count(content, "\n") + 1
 }
 
 func fileExists(path string) bool {
