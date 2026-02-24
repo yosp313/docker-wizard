@@ -6,6 +6,7 @@ VERSION=${VERSION:-""}
 REF=${REF:-""}
 INSTALL_ROOT=${INSTALL_ROOT:-"$HOME/.docker-wizard"}
 LINK_DIR=${LINK_DIR:-"$HOME/.local/bin"}
+ALLOW_MAIN_FALLBACK=${ALLOW_MAIN_FALLBACK:-""}
 
 if [ -z "$REPO_SLUG" ]; then
   printf '%s\n' "REPO_SLUG is required." >&2
@@ -31,12 +32,19 @@ fi
 
 if [ -z "$REF" ]; then
   printf '%s\n' "Resolving latest release from $REPO_SLUG"
-  if latest_json=$(curl -fsSL "https://api.github.com/repos/$REPO_SLUG/releases/latest"); then
+  if latest_json=$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO_SLUG/releases/latest"); then
     REF=$(printf '%s' "$latest_json" | tr -d '\n' | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p')
   fi
   if [ -z "$REF" ]; then
-    printf '%s\n' "No releases found, falling back to main" >&2
-    REF="main"
+    if [ "$ALLOW_MAIN_FALLBACK" = "1" ]; then
+      printf '%s\n' "No releases found, falling back to main because ALLOW_MAIN_FALLBACK=1" >&2
+      REF="main"
+    else
+      printf '%s\n' "Unable to resolve latest release from $REPO_SLUG." >&2
+      printf '%s\n' "Publish a release first, or set REF=<tag>." >&2
+      printf '%s\n' "For unreleased installs, set REF=main (or ALLOW_MAIN_FALLBACK=1)." >&2
+      exit 1
+    fi
   fi
 fi
 

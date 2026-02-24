@@ -21,6 +21,9 @@ go run .
 curl -fsSL https://raw.githubusercontent.com/yosp313/docker-wizard/main/install.sh | sh
 ```
 
+By default, the installer resolves and installs the latest GitHub Release tag.
+To install an unreleased commit intentionally, set `REF=main`.
+
 ## CLI
 ```bash
 docker-wizard --version
@@ -50,7 +53,8 @@ docker-wizard --version
 - `.dockerignore` (only if missing)
 
 ## Releases
-- Every push to `main` auto-tags a new patch release and publishes a GitHub Release.
+- Every push to `main` runs CI (`gofmt` check, `go vet`, `go test`, `go build`).
+- If CI passes on `main`, the pipeline auto-tags the commit with the next patch (`vX.Y.Z`) and publishes a GitHub Release.
 - Tags use `vX.Y.Z` and start at `v0.1.0` if no tags exist.
 
 ## Configuration

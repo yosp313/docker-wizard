@@ -1,9 +1,11 @@
 name: Auto Tag
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
 
 permissions:
   contents: write
@@ -14,25 +16,49 @@ concurrency:
 
 jobs:
   tag:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
       - name: Create and push tag
+        env:
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --tags
-          latest_tag=$(git describe --tags --match "v*" --abbrev=0 2>/dev/null || true)
-          if [[ -n "$latest_tag" && "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            version="${latest_tag#v}"
-            IFS='.' read -r major minor patch <<< "$version"
+          git fetch --tags origin
+          latest_tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | sed -n '1p')
+          if [[ -n "$latest_tag" && "$latest_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            patch="${BASH_REMATCH[3]}"
             patch=$((patch + 1))
             new_tag="v${major}.${minor}.${patch}"
           else
             new_tag="v0.1.0"
           fi
-          git tag "$new_tag"
-          git push origin "$new_tag"
+
+          if [ -n "$(git ls-remote --tags --refs origin "$new_tag")" ]; then
+            printf '%s\n' "Tag $new_tag already exists on origin, skipping."
+            exit 0
+          fi
+
+          git tag "$new_tag" "$TARGET_SHA"
+
+          if git push origin "$new_tag"; then
+            printf '%s\n' "Pushed $new_tag"
+            exit 0
+          fi
+
+          git fetch --tags origin
+          if [ -n "$(git ls-remote --tags --refs origin "$new_tag")" ]; then
+            printf '%s\n' "Tag $new_tag was created concurrently, skipping."
+            exit 0
+          fi
+
+          printf '%s\n' "Failed to push tag $new_tag" >&2
+          exit 1
