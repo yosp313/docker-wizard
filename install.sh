@@ -101,9 +101,16 @@ if [ ! -f "$src_dir/config/services.json" ]; then
   exit 1
 fi
 
+if [ ! -f "$src_dir/config/dockerfiles.json" ]; then
+  printf '%s\n' "missing config/dockerfiles.json in source" >&2
+  exit 1
+fi
+
 cp "$src_dir/config/services.json" "$CONFIG_DIR/services.json"
+cp "$src_dir/config/dockerfiles.json" "$CONFIG_DIR/dockerfiles.json"
 ln -sf "$BIN_DIR/docker-wizard" "$LINK_DIR/docker-wizard"
 
 printf '%s\n' "Installed to $BIN_DIR/docker-wizard"
 printf '%s\n' "Config at $CONFIG_DIR/services.json"
+printf '%s\n' "Config at $CONFIG_DIR/dockerfiles.json"
 printf '%s\n' "Make sure $LINK_DIR is in your PATH"

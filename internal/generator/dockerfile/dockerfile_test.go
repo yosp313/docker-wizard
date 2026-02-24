@@ -1,13 +1,18 @@
 package dockerfile
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestDockerfileNodeUsesNpmCIWithPackageLock(t *testing.T) {
+	root := t.TempDir()
+	writeDockerfileCatalog(t, root)
+
 	details := LanguageDetails{Type: LanguageNode, HasPackageLock: true}
-	content, err := Dockerfile(details)
+	content, err := Dockerfile(root, details)
 	if err != nil {
 		t.Fatalf("dockerfile: %v", err)
 	}
@@ -24,8 +29,11 @@ func TestDockerfileNodeUsesNpmCIWithPackageLock(t *testing.T) {
 }
 
 func TestDockerfileNodeUsesNpmInstallWithoutLockfile(t *testing.T) {
+	root := t.TempDir()
+	writeDockerfileCatalog(t, root)
+
 	details := LanguageDetails{Type: LanguageNode}
-	content, err := Dockerfile(details)
+	content, err := Dockerfile(root, details)
 	if err != nil {
 		t.Fatalf("dockerfile: %v", err)
 	}
@@ -36,8 +44,11 @@ func TestDockerfileNodeUsesNpmInstallWithoutLockfile(t *testing.T) {
 }
 
 func TestDockerfileJavaUsesMavenMultiStage(t *testing.T) {
+	root := t.TempDir()
+	writeDockerfileCatalog(t, root)
+
 	details := LanguageDetails{Type: LanguageJava, HasPomXML: true, JavaVersion: "21"}
-	content, err := Dockerfile(details)
+	content, err := Dockerfile(root, details)
 	if err != nil {
 		t.Fatalf("dockerfile: %v", err)
 	}
@@ -54,8 +65,11 @@ func TestDockerfileJavaUsesMavenMultiStage(t *testing.T) {
 }
 
 func TestDockerfileDotNetUsesMultiStageAndProjectDLL(t *testing.T) {
+	root := t.TempDir()
+	writeDockerfileCatalog(t, root)
+
 	details := LanguageDetails{Type: LanguageDotNet, DotNetVersion: "8.0", DotNetProject: "Service.Api"}
-	content, err := Dockerfile(details)
+	content, err := Dockerfile(root, details)
 	if err != nil {
 		t.Fatalf("dockerfile: %v", err)
 	}
@@ -68,5 +82,42 @@ func TestDockerfileDotNetUsesMultiStageAndProjectDLL(t *testing.T) {
 	}
 	if !strings.Contains(content, "ENV APP_START_CMD=\"dotnet /app/Service.Api.dll\"") {
 		t.Fatalf("expected project dll start command")
+	}
+}
+
+func TestDockerfileReturnsErrorWhenTemplateMissing(t *testing.T) {
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+	if err := os.Mkdir(configDir, 0o755); err != nil {
+		t.Fatalf("create config directory: %v", err)
+	}
+	content := `{"dockerfiles":[{"language":"node","templateLines":["FROM node:20-alpine"]}]}`
+	if err := os.WriteFile(filepath.Join(configDir, "dockerfiles.json"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write dockerfile catalog: %v", err)
+	}
+
+	_, err := Dockerfile(root, LanguageDetails{Type: LanguagePython})
+	if err == nil {
+		t.Fatal("expected missing template error")
+	}
+	if !strings.Contains(err.Error(), "missing dockerfile template") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func writeDockerfileCatalog(t *testing.T, root string) {
+	t.Helper()
+	configDir := filepath.Join(root, "config")
+	if err := os.Mkdir(configDir, 0o755); err != nil {
+		t.Fatalf("create config directory: %v", err)
+	}
+
+	catalogPath := filepath.Join("..", "..", "..", "config", "dockerfiles.json")
+	catalogData, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatalf("read default dockerfile catalog: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "dockerfiles.json"), catalogData, 0o644); err != nil {
+		t.Fatalf("write dockerfile catalog: %v", err)
 	}
 }

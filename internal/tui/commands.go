@@ -39,7 +39,7 @@ func previewCmd(root string, services []string, overrideLang bool, overrideType 
 		if err != nil {
 			return previewDoneMsg{err: err}
 		}
-		dockerfile, err := generator.Dockerfile(details)
+		dockerfile, err := generator.Dockerfile(root, details)
 		if err != nil {
 			return previewDoneMsg{err: err}
 		}
@@ -58,7 +58,7 @@ func generateCmd(root string, services []string, overrideLang bool, overrideType
 		if err != nil {
 			return generateDoneMsg{err: err}
 		}
-		dockerfile, err := generator.Dockerfile(details)
+		dockerfile, err := generator.Dockerfile(root, details)
 		if err != nil {
 			return generateDoneMsg{err: err}
 		}
@@ -89,7 +89,7 @@ func (m *model) prepareReview() error {
 		return err
 	}
 
-	dockerfile, err := generator.Dockerfile(details)
+	dockerfile, err := generator.Dockerfile(m.root, details)
 	if err != nil {
 		return err
 	}

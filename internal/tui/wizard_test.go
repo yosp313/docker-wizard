@@ -10,6 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+const minimalDockerfileCatalogJSON = `{"dockerfiles":[{"language":"unknown","templateLines":["FROM alpine:3.20","WORKDIR /app","COPY . .","ENV APP_START_CMD=\"sh\"","CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"]}]}`
+
 func TestHandleKey_ServiceCursorUsesFilteredLength(t *testing.T) {
 	m := model{
 		step: stepDatabase,
@@ -36,6 +38,9 @@ func TestRetryFromErrorProxyTransitionsToReview(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(configDir, "services.json"), []byte(`{"services":[]}`), 0o644); err != nil {
 		t.Fatalf("write services catalog: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "dockerfiles.json"), []byte(minimalDockerfileCatalogJSON), 0o644); err != nil {
+		t.Fatalf("write dockerfile catalog: %v", err)
 	}
 
 	m := model{

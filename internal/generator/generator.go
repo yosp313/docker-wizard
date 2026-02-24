@@ -53,8 +53,8 @@ func DetectLanguage(root string) (LanguageDetails, error) {
 	return dockerfile.DetectLanguage(root)
 }
 
-func Dockerfile(details LanguageDetails) (string, error) {
-	return dockerfile.Dockerfile(details)
+func Dockerfile(root string, details LanguageDetails) (string, error) {
+	return dockerfile.Dockerfile(root, details)
 }
 
 func Compose(root string, selection ComposeSelection) (string, error) {

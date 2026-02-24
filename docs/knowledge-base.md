@@ -36,6 +36,10 @@
 - Defaults live in `config/services.json` and can be edited there
 - Services declare categories, dependencies, and public exposure
 
+### Dockerfile catalog
+- Dockerfile templates live in `config/dockerfiles.json` and can be edited there
+- Templates are selected by detected language and rendered with detected/default versions
+
 ### Service catalog additions
 - MongoDB (database)
 - Memcached (cache)
@@ -51,6 +55,7 @@
 - .NET: multi-stage build (`dotnet/sdk` builder to `dotnet/aspnet` runtime)
 - Fallback: `alpine:3.20`
 - All templates set `APP_START_CMD` and run through `sh -lc` for command override support
+- Template defaults are stored in `config/dockerfiles.json`
 
 ### File write behavior
 - New files are created

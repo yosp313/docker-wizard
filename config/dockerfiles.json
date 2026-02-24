@@ -1,0 +1,132 @@
+{
+  "dockerfiles": [
+    {
+      "language": "go",
+      "templateLines": [
+        "FROM golang:{{ .GoVersion }}-alpine AS build",
+        "WORKDIR /src",
+        "COPY go.mod{{ if .HasGoSum }} go.sum{{ end }} ./",
+        "RUN go mod download",
+        "COPY . .",
+        "RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/app .",
+        "",
+        "FROM alpine:3.20",
+        "WORKDIR /app",
+        "COPY --from=build /out/app /app/app",
+        "EXPOSE 8080",
+        "ENV APP_START_CMD=\"/app/app\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    },
+    {
+      "language": "node",
+      "templateLines": [
+        "FROM node:{{ .NodeVersion }}-alpine",
+        "WORKDIR /app",
+        "COPY package.json ./",
+        "{{ if .HasYarnLock }}COPY yarn.lock ./{{ end }}",
+        "{{ if .HasPnpmLock }}COPY pnpm-lock.yaml ./{{ end }}",
+        "{{ if and (not .HasYarnLock) (not .HasPnpmLock) .HasPackageLock }}COPY package-lock.json ./{{ end }}",
+        "{{ if or .HasYarnLock .HasPnpmLock }}RUN corepack enable{{ end }}",
+        "RUN {{ .NodeInstallCommand }}",
+        "COPY . .",
+        "EXPOSE 8080",
+        "ENV APP_START_CMD=\"{{ .NodeStartCommand }}\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    },
+    {
+      "language": "python",
+      "templateLines": [
+        "FROM python:{{ .PythonVersion }}-slim",
+        "WORKDIR /app",
+        "{{ if .HasRequirements }}COPY requirements.txt ./{{ end }}",
+        "{{ if .HasRequirements }}RUN pip install --no-cache-dir -r requirements.txt{{ end }}",
+        "COPY . .",
+        "EXPOSE 8080",
+        "ENV APP_START_CMD=\"python main.py\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    },
+    {
+      "language": "ruby",
+      "templateLines": [
+        "FROM ruby:{{ .RubyVersion }}-alpine",
+        "WORKDIR /app",
+        "{{ if .HasGemfile }}COPY Gemfile ./{{ end }}",
+        "{{ if .HasGemfileLock }}COPY Gemfile.lock ./{{ end }}",
+        "{{ if .HasGemfile }}RUN bundle install{{ end }}",
+        "COPY . .",
+        "EXPOSE 8080",
+        "ENV APP_START_CMD=\"ruby app.rb\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    },
+    {
+      "language": "php",
+      "templateLines": [
+        "FROM php:{{ .PHPVersion }}-fpm-alpine",
+        "WORKDIR /app",
+        "{{ if .HasComposerJSON }}COPY composer.json ./{{ end }}",
+        "COPY . .",
+        "EXPOSE 8080",
+        "ENV APP_START_CMD=\"php -S 0.0.0.0:8080 -t public\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    },
+    {
+      "language": "java",
+      "templateLines": [
+        "{{ if .HasPomXML }}FROM maven:3.9-eclipse-temurin-{{ .JavaVersion }} AS build{{ end }}",
+        "{{ if .HasPomXML }}WORKDIR /src{{ end }}",
+        "{{ if .HasPomXML }}COPY pom.xml ./{{ end }}",
+        "{{ if .HasPomXML }}RUN mvn -q -DskipTests dependency:go-offline || true{{ end }}",
+        "{{ if .HasPomXML }}COPY . .{{ end }}",
+        "{{ if .HasPomXML }}RUN mvn -q -DskipTests package && mkdir -p /out && cp \"$(find target -maxdepth 1 -type f -name '*.jar' | head -n 1)\" /out/app.jar{{ end }}",
+        "{{ if and (not .HasPomXML) (or .HasGradle .HasGradleKts) }}FROM gradle:8-jdk{{ .JavaVersion }} AS build{{ end }}",
+        "{{ if and (not .HasPomXML) (or .HasGradle .HasGradleKts) }}WORKDIR /src{{ end }}",
+        "{{ if and (not .HasPomXML) (or .HasGradle .HasGradleKts) }}COPY . .{{ end }}",
+        "{{ if and (not .HasPomXML) (or .HasGradle .HasGradleKts) }}RUN if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew build -x test; else gradle build -x test; fi && mkdir -p /out && cp \"$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)\" /out/app.jar{{ end }}",
+        "{{ if and (not .HasPomXML) (not .HasGradle) (not .HasGradleKts) }}FROM eclipse-temurin:{{ .JavaVersion }}-jre AS build{{ end }}",
+        "{{ if and (not .HasPomXML) (not .HasGradle) (not .HasGradleKts) }}WORKDIR /src{{ end }}",
+        "{{ if and (not .HasPomXML) (not .HasGradle) (not .HasGradleKts) }}COPY . .{{ end }}",
+        "{{ if and (not .HasPomXML) (not .HasGradle) (not .HasGradleKts) }}RUN mkdir -p /out && if [ -f app.jar ]; then cp app.jar /out/app.jar; fi{{ end }}",
+        "",
+        "FROM eclipse-temurin:{{ .JavaVersion }}-jre",
+        "WORKDIR /app",
+        "COPY --from=build /out/app.jar /app/app.jar",
+        "EXPOSE 8080",
+        "ENV APP_START_CMD=\"java -jar /app/app.jar\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    },
+    {
+      "language": "dotnet",
+      "templateLines": [
+        "FROM mcr.microsoft.com/dotnet/sdk:{{ .DotNetVersion }} AS build",
+        "WORKDIR /src",
+        "COPY *.csproj ./",
+        "RUN dotnet restore || true",
+        "COPY . .",
+        "RUN dotnet publish -c Release -o /out",
+        "",
+        "FROM mcr.microsoft.com/dotnet/aspnet:{{ .DotNetVersion }}",
+        "WORKDIR /app",
+        "COPY --from=build /out/ ./",
+        "EXPOSE 8080",
+        "ENV APP_START_CMD=\"dotnet /app/{{ .DotNetEntryDLL }}\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    },
+    {
+      "language": "unknown",
+      "templateLines": [
+        "FROM alpine:3.20",
+        "WORKDIR /app",
+        "COPY . .",
+        "ENV APP_START_CMD=\"sh\"",
+        "CMD [\"sh\", \"-lc\", \"$APP_START_CMD\"]"
+      ]
+    }
+  ]
+}
