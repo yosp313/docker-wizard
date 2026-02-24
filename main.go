@@ -18,6 +18,7 @@ func main() {
 		}
 	}
 	if err := app.Run(); err != nil {
-		fmt.Println("error:", err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
 }

@@ -34,11 +34,31 @@ func WriteFiles(root string, compose string, dockerfile string) (Output, error) 
 		return Output{}, fmt.Errorf("%s already exists", DockerfileFileName)
 	}
 
-	if err := os.WriteFile(composePath, []byte(compose), 0644); err != nil {
-		return Output{}, fmt.Errorf("write compose: %w", err)
+	composeTempPath, err := writeTempFile(root, "docker-compose-*.tmp", compose)
+	if err != nil {
+		return Output{}, fmt.Errorf("write compose temp file: %w", err)
 	}
-	if err := os.WriteFile(dockerfilePath, []byte(dockerfile), 0644); err != nil {
-		return Output{}, fmt.Errorf("write dockerfile: %w", err)
+	defer func() {
+		_ = os.Remove(composeTempPath)
+	}()
+
+	dockerfileTempPath, err := writeTempFile(root, "dockerfile-*.tmp", dockerfile)
+	if err != nil {
+		return Output{}, fmt.Errorf("write dockerfile temp file: %w", err)
+	}
+	defer func() {
+		_ = os.Remove(dockerfileTempPath)
+	}()
+
+	if err := os.Rename(composeTempPath, composePath); err != nil {
+		return Output{}, fmt.Errorf("move compose into place: %w", err)
+	}
+	if err := os.Rename(dockerfileTempPath, dockerfilePath); err != nil {
+		rollbackErr := os.Remove(composePath)
+		if rollbackErr != nil && !os.IsNotExist(rollbackErr) {
+			return Output{}, fmt.Errorf("move dockerfile into place: %w (rollback compose: %v)", err, rollbackErr)
+		}
+		return Output{}, fmt.Errorf("move dockerfile into place: %w", err)
 	}
 
 	dockerignoreCreated := false
@@ -66,6 +86,31 @@ func DefaultDockerignore() string {
 		"dist\n" +
 		"build\n" +
 		"tmp\n"
+}
+
+func writeTempFile(root string, pattern string, content string) (string, error) {
+	tempFile, err := os.CreateTemp(root, pattern)
+	if err != nil {
+		return "", err
+	}
+
+	path := tempFile.Name()
+	if _, err := tempFile.WriteString(content); err != nil {
+		_ = tempFile.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := tempFile.Chmod(0644); err != nil {
+		_ = tempFile.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := tempFile.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+
+	return path, nil
 }
 
 func fileExists(path string) bool {

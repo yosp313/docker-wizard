@@ -24,7 +24,9 @@ require_cmd tar
 require_cmd go
 
 if [ -n "$VERSION" ]; then
-  REF="V$VERSION"
+  normalized_version=${VERSION#v}
+  normalized_version=${normalized_version#V}
+  REF="v$normalized_version"
 fi
 
 if [ -z "$REF" ]; then
@@ -42,7 +44,11 @@ case "$REF" in
   main|master)
     ARCHIVE_URL="https://github.com/$REPO_SLUG/archive/refs/heads/$REF.tar.gz"
     ;;
+  v*)
+    ARCHIVE_URL="https://github.com/$REPO_SLUG/archive/refs/tags/$REF.tar.gz"
+    ;;
   V*)
+    REF="v${REF#V}"
     ARCHIVE_URL="https://github.com/$REPO_SLUG/archive/refs/tags/$REF.tar.gz"
     ;;
   *)
@@ -77,9 +83,7 @@ mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$LINK_DIR"
 
 printf '%s\n' "Building docker-wizard"
 build_flags=""
-if [ -n "$VERSION" ]; then
-  build_flags="-ldflags=-X=main.version=V$VERSION"
-elif [ -n "$REF" ]; then
+if [ -n "$REF" ]; then
   build_flags="-ldflags=-X=main.version=$REF"
 fi
 (cd "$src_dir" && go build $build_flags -o "$BIN_DIR/docker-wizard" .)

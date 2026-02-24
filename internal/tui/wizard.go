@@ -295,18 +295,19 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
-		m.cursor = clampCursor(m.cursor, len(m.filteredServices(m.step)))
+		services := m.filteredServices(m.step)
+		m.cursor = clampCursor(m.cursor, len(services))
 		switch key {
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
 			}
 		case "down", "j":
-			if m.cursor < len(m.services)-1 {
+			if m.cursor < len(services)-1 {
 				m.cursor++
 			}
 		case " ":
-			if len(m.services) > 0 {
+			if len(services) > 0 {
 				m.toggleCurrentSelection()
 			}
 		case "enter":
@@ -403,6 +404,17 @@ func (m *model) retryFromError() tea.Cmd {
 		m.step = stepDetect
 		m.animateHeader()
 		return detectCmd(m.root)
+	}
+	if m.previousStep == stepProxy {
+		if err := m.prepareReview(); err != nil {
+			m.err = err
+			m.step = stepError
+			m.animateHeader()
+			return nil
+		}
+		m.step = stepReview
+		m.animateHeader()
+		return nil
 	}
 	if m.previousStep == stepGenerate {
 		m.step = stepGenerate
