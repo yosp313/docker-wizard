@@ -22,6 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/yosp313/docker-wizard/main/install.
 ```
 
 By default, the installer resolves and installs the latest GitHub Release tag.
+Default install root is `~/.docker-wizard`.
 To install an unreleased commit intentionally, set `REF=main`.
 
 ## CLI

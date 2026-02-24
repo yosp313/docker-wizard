@@ -33,7 +33,7 @@ fi
 if [ -z "$REF" ]; then
   printf '%s\n' "Resolving latest release from $REPO_SLUG"
   if latest_json=$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO_SLUG/releases/latest"); then
-    REF=$(printf '%s' "$latest_json" | tr -d '\n' | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p')
+    REF=$(printf '%s\n' "$latest_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
   fi
   if [ -z "$REF" ]; then
     if [ "$ALLOW_MAIN_FALLBACK" = "1" ]; then
@@ -85,8 +85,8 @@ if [ ! -d "$src_dir" ]; then
   exit 1
 fi
 
-BIN_DIR="$INSTALL_ROOT/bin"
-CONFIG_DIR="$BIN_DIR/config"
+BIN_DIR="$INSTALL_ROOT"
+CONFIG_DIR="$INSTALL_ROOT/config"
 mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$LINK_DIR"
 
 printf '%s\n' "Building docker-wizard"
