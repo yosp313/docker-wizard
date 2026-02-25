@@ -97,6 +97,11 @@
 - Review and generate
 - Result
 
+### Run modes
+- Styled mode (`--mode styled`, default): full TUI styling
+- Plain mode (`--mode plain`): same TUI flow with plain text rendering for terminal compatibility
+- CLI interactive mode (`--mode cli`): prompt-driven non-TUI flow
+
 ## Planned / TBD
 - Extensibility: how to add a new service or language template
 - Testing: unit tests, fixture projects, and snapshot tests

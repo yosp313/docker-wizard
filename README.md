@@ -28,7 +28,15 @@ To install an unreleased commit intentionally, set `REF=main`.
 ## CLI
 ```bash
 docker-wizard --version
+docker-wizard --mode styled
+docker-wizard --mode plain
+docker-wizard --mode cli
 ```
+
+Run modes:
+- `styled` (default): full TUI with Lip Gloss styling and animations
+- `plain`: TUI flow with plain-text rendering for maximum terminal compatibility
+- `cli`: line-by-line interactive prompts (non-TUI)
 
 ## Usage flow
 1. Start the wizard.

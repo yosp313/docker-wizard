@@ -41,6 +41,10 @@ func (m model) View() string {
 	default:
 		content = ""
 	}
+	if isPlainMode() {
+		return strings.Join([]string{m.renderHeader(), content, m.renderFooter()}, "\n")
+	}
+	content = lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(content)
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -55,34 +59,51 @@ func (m model) renderHeader() string {
 	padding := strings.Repeat(" ", indent)
 
 	stepText := fmt.Sprintf("Step %d/%d", m.stepIndex(), totalSteps)
+	stepName := stepName(m.step)
 	langText := "language: detecting"
 	if m.langDetected {
 		langText = "language: " + languageLabelWithVersion(m.effectiveDetails())
 	}
-	progress := progressBar(m.stepIndex(), totalSteps, 22)
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(titleColor(m.frame))
-	art := titleArt()
-	for i := range art {
-		art[i] = titleStyle.Render(art[i])
+	projectName := baseName(m.root)
+	if projectName == "" {
+		projectName = "."
 	}
-	artBlock := lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(strings.Join(art, "\n"))
+	if isPlainMode() {
+		return plainHeader(m.stepIndex(), totalSteps, stepName, langText, projectName, progressChips(m.stepIndex(), totalSteps), indent)
+	}
+
+	title := lipgloss.NewStyle().Bold(true).Foreground(titleColor(m.frame)).Render("Docker Wizard")
+	subtitle := mutedStyle().Render("Generate Dockerfile and docker-compose from guided selections")
+	project := mutedStyle().Render("project: " + projectName)
 
 	stepBadge := badgeStyle().Render(stepText)
+	stepNameBadge := badgeStyle().Render(stepName)
 	langBadge := badgeStyle().Render(langText)
-	progressBadge := badgeStyle().Render(progress)
+	status := lipgloss.JoinHorizontal(lipgloss.Left, stepBadge, "  ", stepNameBadge, "  ", langBadge)
+	status = lipgloss.NewStyle().Width(contentWidth(m.width)).Align(lipgloss.Center).Render(status)
 
-	bar := lipgloss.JoinHorizontal(lipgloss.Center, stepBadge, "  ", progressBadge, "  ", langBadge)
-	bar = lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(bar)
+	chips := progressChips(m.stepIndex(), totalSteps)
+	chips = lipgloss.NewStyle().Width(contentWidth(m.width)).Align(lipgloss.Center).Render(chips)
 
-	content := lipgloss.JoinVertical(lipgloss.Center, artBlock, "", bar)
+	heading := lipgloss.JoinVertical(lipgloss.Center, title, subtitle, project)
+	heading = lipgloss.NewStyle().Width(contentWidth(m.width)).Align(lipgloss.Center).Render(heading)
+
+	content := lipgloss.JoinVertical(lipgloss.Center, heading, "", status, chips)
+	content = lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(content)
 	box := headerStyle(m.width).Render(padding + content)
 	return box
 }
 
 func (m model) renderFooter() string {
-	keys := m.footerKeys()
-	return footerStyle(m.width).Render(keys)
+	hints := formatFooterHints(m.footerKeys())
+	if isPlainMode() {
+		return hints
+	}
+	innerWidth := m.width - 4
+	if innerWidth < 20 {
+		innerWidth = 20
+	}
+	return footerStyle(m.width).Render(lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hints))
 }
 
 func (m model) footerKeys() string {
@@ -129,14 +150,14 @@ func (m model) viewWelcome() string {
 		"generate a Dockerfile, and create a docker-compose.yml",
 		"with the services you choose.",
 	}
-	return cardStyle(m.width).Render(sectionTitle("Welcome") + "\n\n" + strings.Join(body, "\n"))
+	return m.renderCard("Welcome", strings.Join(body, "\n"))
 }
 
 func (m model) viewDetect() string {
 	if !m.detectDone {
 		text := "Detecting project language"
 		line := fmt.Sprintf("%s %s", m.spinner.View(), text)
-		return cardStyle(m.width).Render(sectionTitle("Detect") + "\n\n" + line)
+		return m.renderCard("Detect", line)
 	}
 
 	body := []string{
@@ -145,7 +166,7 @@ func (m model) viewDetect() string {
 		"",
 		"Press l to choose a different language.",
 	}
-	return cardStyle(m.width).Render(sectionTitle("Detect") + "\n\n" + strings.Join(body, "\n"))
+	return m.renderCard("Detect", strings.Join(body, "\n"))
 }
 
 func (m model) viewLanguage() string {
@@ -162,12 +183,13 @@ func (m model) viewLanguage() string {
 		}
 		line := fmt.Sprintf("%s %s %s", cursor, check, option.Label)
 		if option.Description != "" {
-			line += "  " + mutedStyle().Render(option.Description)
+			line += " - " + option.Description
 		}
-		items = append(items, serviceLineStyle(i == m.langCursor, selected).Render(line))
+		rendered := serviceLineStyle(i == m.langCursor, selected).Render(line)
+		items = append(items, rendered)
 	}
 	content := strings.Join(items, "\n")
-	return cardStyle(m.width).Render(sectionTitle("Language") + "\n\n" + content)
+	return m.renderCard("Language", content)
 }
 
 func (m model) viewServices(current step) string {
@@ -184,12 +206,86 @@ func (m model) viewServices(current step) string {
 		}
 		line := fmt.Sprintf("%s %s %s", cursor, check, svc.Label)
 		if svc.Description != "" {
-			line += "  " + mutedStyle().Render(svc.Description)
+			line += " - " + svc.Description
 		}
-		items = append(items, serviceLineStyle(i == m.cursor, m.selected[svc.ID]).Render(line))
+		rendered := serviceLineStyle(i == m.cursor, m.selected[svc.ID]).Render(line)
+		items = append(items, rendered)
 	}
 	content := strings.Join(items, "\n")
-	return cardStyle(m.width).Render(sectionTitle(stepTitle(current)) + "\n\n" + content)
+	return m.renderCard(stepTitle(current), content)
+}
+
+func formatFooterHints(raw string) string {
+	parts := strings.Split(raw, "|")
+	formatted := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		fields := strings.Fields(part)
+		if len(fields) >= 2 && isKeyToken(fields[0]) {
+			if isPlainMode() {
+				formatted = append(formatted, "["+fields[0]+"] "+strings.Join(fields[1:], " "))
+				continue
+			}
+			key := keycapStyle().Render(fields[0])
+			label := mutedStyle().Render(strings.Join(fields[1:], " "))
+			formatted = append(formatted, lipgloss.JoinHorizontal(lipgloss.Left, key, " ", label))
+			continue
+		}
+		if isPlainMode() {
+			formatted = append(formatted, part)
+		} else {
+			formatted = append(formatted, mutedStyle().Render(part))
+		}
+	}
+	if isPlainMode() {
+		return strings.Join(formatted, " | ")
+	}
+	return strings.Join(formatted, "   ")
+}
+
+func isKeyToken(token string) bool {
+	switch token {
+	case "enter", "q", "b", "l", "p", "r", "space", "up/down", "home", "end":
+		return true
+	default:
+		return false
+	}
+}
+
+func stepName(current step) string {
+	switch current {
+	case stepWelcome:
+		return "welcome"
+	case stepDetect:
+		return "detect"
+	case stepLanguage:
+		return "language"
+	case stepDatabase:
+		return "databases"
+	case stepMessageQueue:
+		return "message queues"
+	case stepCache:
+		return "cache"
+	case stepAnalytics:
+		return "analytics"
+	case stepProxy:
+		return "proxies"
+	case stepReview:
+		return "review"
+	case stepPreview:
+		return "preview"
+	case stepGenerate:
+		return "generate"
+	case stepResult:
+		return "result"
+	case stepError:
+		return "error"
+	default:
+		return "wizard"
+	}
 }
 
 func (m model) viewReview() string {
@@ -237,13 +333,13 @@ func (m model) viewReview() string {
 		}
 		body = append(body, warningBlock...)
 	}
-	return cardStyle(m.width).Render(sectionTitle("Review") + "\n\n" + strings.Join(body, "\n"))
+	return m.renderCard("Review", strings.Join(body, "\n"))
 }
 
 func (m model) viewPreview() string {
 	if !m.previewReady {
 		line := fmt.Sprintf("%s Preparing preview", m.spinner.View())
-		return cardStyle(m.width).Render(sectionTitle("Preview") + "\n\n" + line)
+		return m.renderCard("Preview", line)
 	}
 
 	content := m.previewContent
@@ -271,12 +367,12 @@ func (m model) viewPreview() string {
 		"",
 		m.previewViewport.View(),
 	}
-	return cardStyle(m.width).Render(sectionTitle("Preview") + "\n\n" + strings.Join(body, "\n"))
+	return m.renderCard("Preview", strings.Join(body, "\n"))
 }
 
 func (m model) viewGenerate() string {
 	line := fmt.Sprintf("%s Generating docker-compose.yml and Dockerfile", m.spinner.View())
-	return cardStyle(m.width).Render(sectionTitle("Generate") + "\n\n" + line)
+	return m.renderCard("Generate", line)
 }
 
 func (m model) viewResult() string {
@@ -313,7 +409,7 @@ func (m model) viewResult() string {
 		"- docker compose up",
 	)
 
-	return cardStyle(m.width).Render(sectionTitle("Result") + "\n\n" + strings.Join(body, "\n"))
+	return m.renderCard("Result", strings.Join(body, "\n"))
 }
 
 func (m model) viewError() string {
@@ -326,7 +422,30 @@ func (m model) viewError() string {
 		"",
 		message,
 	}
-	return errorStyle(m.width).Render(sectionTitle("Error") + "\n\n" + strings.Join(body, "\n"))
+	return m.renderErrorCard("Error", strings.Join(body, "\n"))
+}
+
+func (m model) contentAreaHeight() int {
+	if m.height <= 0 {
+		return 0
+	}
+	headerHeight := lipgloss.Height(m.renderHeader())
+	footerHeight := lipgloss.Height(m.renderFooter())
+	available := m.height - headerHeight - footerHeight
+	if available < 1 {
+		return 1
+	}
+	return available
+}
+
+func (m model) renderCard(title string, body string) string {
+	style := cardStyle(m.width)
+	return style.Render(sectionTitle(title) + "\n\n" + body)
+}
+
+func (m model) renderErrorCard(title string, body string) string {
+	style := errorStyle(m.width)
+	return style.Render(sectionTitle(title) + "\n\n" + body)
 }
 
 func buildPreviewLines(preview generator.Preview, blockers []string) []string {

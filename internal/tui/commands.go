@@ -12,7 +12,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func detectCmd(root string) tea.Cmd {
@@ -124,13 +123,10 @@ func (m *model) prepareReview() error {
 }
 
 func (m *model) previewContentHeight() int {
-	if m.height <= 0 {
-		return 12
+	available := m.contentAreaHeight() - 8
+	if available > 18 {
+		available = 18
 	}
-	headerHeight := lipgloss.Height(m.renderHeader())
-	footerHeight := lipgloss.Height(m.renderFooter())
-	available := m.height - headerHeight - footerHeight - 6
-	available -= 2
 	if available < 6 {
 		return 6
 	}
@@ -138,10 +134,7 @@ func (m *model) previewContentHeight() int {
 }
 
 func (m *model) previewContentWidth() int {
-	if m.width <= 0 {
-		return 80
-	}
-	available := m.width - 10
+	available := contentWidth(m.width) - 6
 	if available < 20 {
 		return 20
 	}
