@@ -114,11 +114,7 @@ func badgeStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle()
 	}
-	return lipgloss.NewStyle().
-		Padding(0, 1).
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(paletteBorder).
-		Foreground(paletteCyan)
+	return lipgloss.NewStyle().Foreground(paletteCyan).Bold(true)
 }
 
 func mutedStyle() lipgloss.Style {
@@ -163,33 +159,29 @@ func doneChipStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle()
 	}
-	return lipgloss.NewStyle().
-		Padding(0, 1).
-		Foreground(paletteGreen).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(paletteGreen)
+	return lipgloss.NewStyle().Foreground(paletteGreen)
 }
 
 func currentChipStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle()
 	}
-	return lipgloss.NewStyle().
-		Padding(0, 1).
-		Foreground(paletteAccent).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(paletteAccent)
+	return lipgloss.NewStyle().Foreground(paletteAccent).Bold(true)
 }
 
 func pendingChipStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle()
 	}
-	return lipgloss.NewStyle().
-		Padding(0, 1).
-		Foreground(paletteMuted).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(paletteBorder)
+	return lipgloss.NewStyle().Foreground(paletteMuted)
+}
+
+func activePreviewTabStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true)
+}
+
+func inactivePreviewTabStyle() lipgloss.Style {
+	return lipgloss.NewStyle()
 }
 
 func blockerTitle() lipgloss.Style {
@@ -246,9 +238,9 @@ func progressChips(current int, total int) string {
 	return lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		doneChipStyle().Render("done "+strconv.Itoa(done)),
-		" ",
+		" | ",
 		currentChipStyle().Render("now "+strconv.Itoa(current)+"/"+strconv.Itoa(total)),
-		" ",
+		" | ",
 		pendingChipStyle().Render("left "+strconv.Itoa(left)),
 	)
 }

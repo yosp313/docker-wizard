@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"docker-wizard/internal/generator"
@@ -94,6 +93,7 @@ type model struct {
 	createDockerignore bool
 	previewContent     string
 	previewViewport    viewport.Model
+	previewTab         int
 	frame              int
 
 	output       generator.Output
@@ -191,8 +191,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.preview = msg.preview
 		m.previewReady = true
-		m.previewContent = strings.Join(buildPreviewLines(msg.preview, m.blockers), "\n")
-		m.setPreviewViewportContent(m.previewContent)
+		if m.previewTab < 0 || m.previewTab >= len(m.previewTabItems()) {
+			m.previewTab = 0
+		}
+		m.refreshPreviewTabContent()
 		m.step = stepPreview
 		m.animateHeader()
 		return m, nil
@@ -299,6 +301,7 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		case "p":
 			m.previewReady = false
 			m.preview = generator.Preview{}
+			m.previewTab = 0
 			m.previewContent = ""
 			m.setPreviewViewportContent("")
 			m.step = stepPreview
@@ -318,6 +321,21 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		switch key {
+		case "left", "h":
+			m.switchPreviewTab(-1)
+			return nil
+		case "right", "l":
+			m.switchPreviewTab(1)
+			return nil
+		case "1":
+			m.setPreviewTab(0)
+			return nil
+		case "2":
+			m.setPreviewTab(1)
+			return nil
+		case "3":
+			m.setPreviewTab(2)
+			return nil
 		case "home":
 			m.previewViewport.GotoTop()
 			return nil
@@ -386,7 +404,7 @@ func (m *model) retryFromError() tea.Cmd {
 }
 
 func (m *model) animateHeader() {
-	m.headerPos = 1
+	m.headerPos = 0
 	m.headerVel = 0
 	m.headerTarget = 0
 	if m.lastStep != m.step {
@@ -436,4 +454,80 @@ func (m model) isLanguageSelected(option languageChoice) bool {
 		return false
 	}
 	return m.overrideType == option.Language
+}
+
+type previewTabItem struct {
+	Name string
+	File generator.FilePreview
+}
+
+func (m model) previewTabItems() []previewTabItem {
+	return []previewTabItem{
+		{Name: generator.ComposeFileName, File: m.preview.Compose},
+		{Name: generator.DockerfileFileName, File: m.preview.Dockerfile},
+		{Name: generator.DockerignoreFileName, File: m.preview.Dockerignore},
+	}
+}
+
+func (m model) activePreviewTab() previewTabItem {
+	items := m.previewTabItems()
+	if len(items) == 0 {
+		return previewTabItem{}
+	}
+	index := m.previewTab
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(items) {
+		index = len(items) - 1
+	}
+	return items[index]
+}
+
+func (m model) activePreviewTabContent() string {
+	tab := m.activePreviewTab()
+	if tab.Name == "" {
+		return ""
+	}
+	if tab.File.Status == generator.FileStatusExists {
+		return "existing file will be kept"
+	}
+	if tab.File.Content == "" {
+		return "no preview available"
+	}
+	return tab.File.Content
+}
+
+func (m *model) refreshPreviewTabContent() {
+	m.previewContent = m.activePreviewTabContent()
+	m.setPreviewViewportContent(m.previewContent)
+}
+
+func (m *model) setPreviewTab(index int) {
+	items := m.previewTabItems()
+	if len(items) == 0 {
+		m.previewTab = 0
+		return
+	}
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(items) {
+		index = len(items) - 1
+	}
+	if m.previewTab == index {
+		return
+	}
+	m.previewTab = index
+	if m.previewReady {
+		m.refreshPreviewTabContent()
+	}
+}
+
+func (m *model) switchPreviewTab(delta int) {
+	items := m.previewTabItems()
+	if len(items) == 0 || delta == 0 {
+		return
+	}
+	m.setPreviewTab(m.previewTab + delta)
 }

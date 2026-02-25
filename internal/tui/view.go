@@ -45,13 +45,21 @@ func (m model) View() string {
 		return strings.Join([]string{m.renderHeader(), content, m.renderFooter()}, "\n")
 	}
 	content = lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(content)
-
-	return lipgloss.JoinVertical(
+	view := lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.renderHeader(),
 		content,
 		m.renderFooter(),
 	)
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.height).
+			Background(palettePanel).
+			Foreground(paletteText).
+			Render(view)
+	}
+	return view
 }
 
 func (m model) renderHeader() string {
@@ -129,9 +137,9 @@ func (m model) footerKeys() string {
 			return "preparing preview..."
 		}
 		if len(m.blockers) > 0 {
-			return "up/down scroll | b back | q quit"
+			return "left/right tab | 1/2/3 file | up/down scroll | b back | q quit"
 		}
-		return "up/down scroll | enter generate | b back | q quit"
+		return "left/right tab | 1/2/3 file | up/down scroll | enter generate | b back | q quit"
 	case stepGenerate:
 		return "generating..."
 	case stepResult:
@@ -248,7 +256,7 @@ func formatFooterHints(raw string) string {
 
 func isKeyToken(token string) bool {
 	switch token {
-	case "enter", "q", "b", "l", "p", "r", "space", "up/down", "home", "end":
+	case "enter", "q", "b", "l", "p", "r", "space", "up/down", "left/right", "1/2/3", "home", "end":
 		return true
 	default:
 		return false
@@ -342,9 +350,10 @@ func (m model) viewPreview() string {
 		return m.renderCard("Preview", line)
 	}
 
+	tab := m.activePreviewTab()
 	content := m.previewContent
 	if content == "" {
-		content = strings.Join(buildPreviewLines(m.preview, m.blockers), "\n")
+		content = m.activePreviewTabContent()
 	}
 
 	totalLines := lineCount(content)
@@ -362,12 +371,35 @@ func (m model) viewPreview() string {
 		}
 		lineInfo = fmt.Sprintf("Lines %d-%d of %d", start, end, totalLines)
 	}
-	body := []string{
-		mutedStyle().Render(lineInfo),
-		"",
-		m.previewViewport.View(),
+
+	body := []string{m.renderPreviewTabs(), ""}
+	if tab.Name != "" {
+		body = append(body, fmt.Sprintf("%s (%s)", tab.Name, previewStatusLabel(tab.File.Status)))
 	}
-	return m.renderCard("Preview", strings.Join(body, "\n"))
+	body = append(body, lineInfo, "")
+	if len(m.blockers) > 0 {
+		body = append(body, blockerTitle().Render("Blocking issues"))
+		for _, blocker := range m.blockers {
+			body = append(body, "- "+blocker)
+		}
+		body = append(body, "")
+	}
+	body = append(body, m.previewViewport.View())
+	return m.renderCompactCard("Preview", strings.Join(body, "\n"))
+}
+
+func (m model) renderPreviewTabs() string {
+	items := m.previewTabItems()
+	parts := make([]string, 0, len(items))
+	for i, tab := range items {
+		label := fmt.Sprintf("%d %s", i+1, tab.Name)
+		if i == m.previewTab {
+			parts = append(parts, activePreviewTabStyle().Render("[> "+label+"]"))
+		} else {
+			parts = append(parts, inactivePreviewTabStyle().Render("[  "+label+"]"))
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func (m model) viewGenerate() string {
@@ -448,35 +480,9 @@ func (m model) renderErrorCard(title string, body string) string {
 	return style.Render(sectionTitle(title) + "\n\n" + body)
 }
 
-func buildPreviewLines(preview generator.Preview, blockers []string) []string {
-	lines := []string{}
-	lines = appendPreviewBlock(lines, generator.ComposeFileName, preview.Compose, true)
-	lines = append(lines, "")
-	lines = appendPreviewBlock(lines, generator.DockerfileFileName, preview.Dockerfile, true)
-	lines = append(lines, "")
-	showDockerignore := preview.Dockerignore.Status != generator.FileStatusExists
-	lines = appendPreviewBlock(lines, generator.DockerignoreFileName, preview.Dockerignore, showDockerignore)
-	if len(blockers) > 0 {
-		lines = append(lines, "", "Blocking issues:")
-		for _, blocker := range blockers {
-			lines = append(lines, "- "+blocker)
-		}
-	}
-	return lines
-}
-
-func appendPreviewBlock(lines []string, name string, preview generator.FilePreview, showContent bool) []string {
-	status := previewStatusLabel(preview.Status)
-	lines = append(lines, fmt.Sprintf("%s (%s)", name, status))
-	if showContent && preview.Content != "" {
-		lines = append(lines, "  ---")
-		lines = append(lines, indentLines(preview.Content, "  ")...)
-		return lines
-	}
-	if preview.Status == generator.FileStatusExists {
-		lines = append(lines, "  existing file will be kept")
-	}
-	return lines
+func (m model) renderCompactCard(title string, body string) string {
+	style := cardStyle(m.width)
+	return style.Render(sectionTitle(title) + "\n" + body)
 }
 
 func previewStatusLabel(status generator.FileStatus) string {
@@ -492,12 +498,4 @@ func previewStatusLabel(status generator.FileStatus) string {
 	default:
 		return string(status)
 	}
-}
-
-func indentLines(value string, indent string) []string {
-	lines := strings.Split(value, "\n")
-	for i := range lines {
-		lines[i] = indent + lines[i]
-	}
-	return lines
 }

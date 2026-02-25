@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"docker-wizard/internal/generator"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -107,5 +109,64 @@ func TestHandleKey_PreviewHomeAndEnd(t *testing.T) {
 	m.handleKey(tea.KeyMsg{Type: tea.KeyHome})
 	if m.previewViewport.YOffset != 0 {
 		t.Fatalf("expected preview offset at top, got %d", m.previewViewport.YOffset)
+	}
+}
+
+func TestHandleKey_PreviewTabSwitchArrowsAndNumbers(t *testing.T) {
+	m := model{
+		step:         stepPreview,
+		previewReady: true,
+		preview: generator.Preview{
+			Compose:    generator.FilePreview{Status: generator.FileStatusNew, Content: "compose\nline2\nline3\nline4"},
+			Dockerfile: generator.FilePreview{Status: generator.FileStatusNew, Content: "dockerfile\nline2\nline3\nline4"},
+			Dockerignore: generator.FilePreview{Status: generator.FileStatusNew,
+				Content: "dockerignore\nline2\nline3\nline4",
+			},
+		},
+		previewTab: 0,
+		width:      100,
+		height:     40,
+	}
+	m.refreshPreviewTabContent()
+
+	m.previewViewport.YOffset = 2
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRight})
+	if m.previewTab != 1 {
+		t.Fatalf("expected preview tab 1, got %d", m.previewTab)
+	}
+	if !strings.Contains(m.previewContent, "dockerfile") {
+		t.Fatalf("expected dockerfile content, got %q", m.previewContent)
+	}
+	if m.previewViewport.YOffset != 0 {
+		t.Fatalf("expected preview offset reset to top, got %d", m.previewViewport.YOffset)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	if m.previewTab != 2 {
+		t.Fatalf("expected preview tab 2, got %d", m.previewTab)
+	}
+	if !strings.Contains(m.previewContent, "dockerignore") {
+		t.Fatalf("expected dockerignore content, got %q", m.previewContent)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyLeft})
+	if m.previewTab != 1 {
+		t.Fatalf("expected preview tab 1 after left, got %d", m.previewTab)
+	}
+}
+
+func TestActivePreviewTabContentExistsStatus(t *testing.T) {
+	m := model{
+		preview: generator.Preview{
+			Compose:      generator.FilePreview{Status: generator.FileStatusNew, Content: "compose"},
+			Dockerfile:   generator.FilePreview{Status: generator.FileStatusNew, Content: "dockerfile"},
+			Dockerignore: generator.FilePreview{Status: generator.FileStatusExists},
+		},
+		previewTab: 2,
+	}
+
+	got := m.activePreviewTabContent()
+	if got != "existing file will be kept" {
+		t.Fatalf("expected exists message, got %q", got)
 	}
 }
