@@ -101,6 +101,13 @@
 - Styled mode (`--mode styled`, default): full TUI styling
 - Plain mode (`--mode plain`): same TUI flow with plain text rendering for terminal compatibility
 - CLI interactive mode (`--mode cli`): prompt-driven non-TUI flow
+- Batch mode (`--mode batch`): non-interactive flag-driven flow for CI/bootstrap usage
+
+### Batch mode flags
+- `--services`: comma-separated service IDs or `all`
+- `--language`: optional language override (`go`, `node`, `python`, `ruby`, `php`, `java`, `dotnet`, `auto`)
+- `--dry-run`: preview only (default when `--write` is not set)
+- `--write`: write generated files
 
 ## Planned / TBD
 - Extensibility: how to add a new service or language template

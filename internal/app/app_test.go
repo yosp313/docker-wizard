@@ -13,6 +13,7 @@ func TestParseMode(t *testing.T) {
 		{name: "styled", input: "styled", want: ModeStyled},
 		{name: "plain", input: "plain", want: ModePlain},
 		{name: "cli", input: "cli", want: ModeCLI},
+		{name: "batch", input: "batch", want: ModeBatch},
 		{name: "case-insensitive", input: "PLAIN", want: ModePlain},
 		{name: "invalid", input: "weird", wantErr: true},
 	}

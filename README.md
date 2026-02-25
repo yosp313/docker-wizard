@@ -31,12 +31,21 @@ docker-wizard --version
 docker-wizard --mode styled
 docker-wizard --mode plain
 docker-wizard --mode cli
+docker-wizard --mode batch --services mysql,redis --language go --dry-run
+docker-wizard --mode batch --services all --write
 ```
 
 Run modes:
 - `styled` (default): full TUI with Lip Gloss styling and animations
 - `plain`: TUI flow with plain-text rendering for maximum terminal compatibility
 - `cli`: line-by-line interactive prompts (non-TUI)
+- `batch`: non-interactive automation mode driven by flags
+
+Batch mode flags:
+- `--services`: comma-separated service IDs (for example `mysql,redis`) or `all`
+- `--language`: optional override (`go`, `node`, `python`, `ruby`, `php`, `java`, `dotnet`, `auto`)
+- `--dry-run`: preview file status and warnings without writing (default behavior)
+- `--write`: write generated files
 
 ## Usage flow
 1. Start the wizard.

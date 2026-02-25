@@ -15,10 +15,19 @@ const (
 	ModeStyled Mode = "styled"
 	ModePlain  Mode = "plain"
 	ModeCLI    Mode = "cli"
+	ModeBatch  Mode = "batch"
 )
 
+type AutomationOptions struct {
+	Services []string
+	Language string
+	Write    bool
+	DryRun   bool
+}
+
 type Options struct {
-	Mode Mode
+	Mode       Mode
+	Automation AutomationOptions
 }
 
 func ParseMode(value string) (Mode, error) {
@@ -30,8 +39,10 @@ func ParseMode(value string) (Mode, error) {
 		return ModePlain, nil
 	case ModeCLI:
 		return ModeCLI, nil
+	case ModeBatch:
+		return ModeBatch, nil
 	default:
-		return "", fmt.Errorf("invalid mode %q (expected styled, plain, or cli)", value)
+		return "", fmt.Errorf("invalid mode %q (expected styled, plain, cli, or batch)", value)
 	}
 }
 
@@ -59,6 +70,13 @@ func RunWithOptions(options Options) error {
 		return tui.RunWizard(root)
 	case ModeCLI:
 		return cliwizard.RunInteractive(root)
+	case ModeBatch:
+		return cliwizard.RunNonInteractive(root, cliwizard.NonInteractiveOptions{
+			Services: options.Automation.Services,
+			Language: options.Automation.Language,
+			Write:    options.Automation.Write,
+			DryRun:   options.Automation.DryRun,
+		})
 	default:
 		return fmt.Errorf("unsupported mode: %s", mode)
 	}
