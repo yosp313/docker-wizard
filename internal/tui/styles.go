@@ -148,11 +148,7 @@ func keycapStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle().Bold(true)
 	}
-	return lipgloss.NewStyle().
-		Padding(0, 1).
-		Background(palettePanel2).
-		Bold(true).
-		Foreground(paletteCyan)
+	return lipgloss.NewStyle().Bold(true).Foreground(paletteCyan)
 }
 
 func doneChipStyle() lipgloss.Style {
@@ -177,11 +173,17 @@ func pendingChipStyle() lipgloss.Style {
 }
 
 func activePreviewTabStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Bold(true)
+	if isPlainMode() {
+		return lipgloss.NewStyle().Bold(true)
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(paletteAccent)
 }
 
 func inactivePreviewTabStyle() lipgloss.Style {
-	return lipgloss.NewStyle()
+	if isPlainMode() {
+		return lipgloss.NewStyle()
+	}
+	return lipgloss.NewStyle().Foreground(paletteMuted)
 }
 
 func blockerTitle() lipgloss.Style {

@@ -373,10 +373,11 @@ func (m model) viewPreview() string {
 	}
 
 	body := []string{m.renderPreviewTabs(), ""}
+	body = append(body, mutedStyle().Render("tab: left/right or 1/2/3"), "")
 	if tab.Name != "" {
-		body = append(body, fmt.Sprintf("%s (%s)", tab.Name, previewStatusLabel(tab.File.Status)))
+		body = append(body, fmt.Sprintf("file: %s    status: %s", tab.Name, previewStatusLabel(tab.File.Status)))
 	}
-	body = append(body, lineInfo, "")
+	body = append(body, mutedStyle().Render(lineInfo), mutedStyle().Render(previewDivider(m.width)), "")
 	if len(m.blockers) > 0 {
 		body = append(body, blockerTitle().Render("Blocking issues"))
 		for _, blocker := range m.blockers {
@@ -392,14 +393,38 @@ func (m model) renderPreviewTabs() string {
 	items := m.previewTabItems()
 	parts := make([]string, 0, len(items))
 	for i, tab := range items {
-		label := fmt.Sprintf("%d %s", i+1, tab.Name)
+		label := fmt.Sprintf("%d %s", i+1, previewTabShortName(tab.Name))
 		if i == m.previewTab {
 			parts = append(parts, activePreviewTabStyle().Render("[> "+label+"]"))
 		} else {
 			parts = append(parts, inactivePreviewTabStyle().Render("[  "+label+"]"))
 		}
 	}
-	return strings.Join(parts, " ")
+	return strings.Join(parts, "  ")
+}
+
+func previewTabShortName(name string) string {
+	switch name {
+	case generator.ComposeFileName:
+		return "compose"
+	case generator.DockerfileFileName:
+		return "dockerfile"
+	case generator.DockerignoreFileName:
+		return "dockerignore"
+	default:
+		return name
+	}
+}
+
+func previewDivider(width int) string {
+	w := contentWidth(width) - 10
+	if w < 24 {
+		w = 24
+	}
+	if w > 96 {
+		w = 96
+	}
+	return strings.Repeat("-", w)
 }
 
 func (m model) viewGenerate() string {
