@@ -39,11 +39,11 @@ func PreviewFiles(root string, compose string, dockerfile string) (Preview, erro
 	dockerfilePath := filepath.Join(root, write.DockerfileFileName)
 	dockerignorePath := filepath.Join(root, write.DockerignoreFileName)
 
-	composePreview, err := buildFilePreview(composePath, compose)
+	composePreview, err := buildFilePreview(composePath, compose, write.MergeCompose)
 	if err != nil {
 		return Preview{}, err
 	}
-	dockerfilePreview, err := buildFilePreview(dockerfilePath, dockerfile)
+	dockerfilePreview, err := buildFilePreview(dockerfilePath, dockerfile, write.MergeDockerfile)
 	if err != nil {
 		return Preview{}, err
 	}
@@ -64,7 +64,9 @@ func PreviewFiles(root string, compose string, dockerfile string) (Preview, erro
 	}, nil
 }
 
-func buildFilePreview(path string, content string) (FilePreview, error) {
+type mergeFunc func(existing string, generated string) (string, error)
+
+func buildFilePreview(path string, content string, merge mergeFunc) (FilePreview, error) {
 	if !utils.FileExists(path) {
 		return FilePreview{Path: path, Status: FileStatusNew, Content: content}, nil
 	}
@@ -74,10 +76,19 @@ func buildFilePreview(path string, content string) (FilePreview, error) {
 		return FilePreview{}, fmt.Errorf("read %s: %w", filepath.Base(path), err)
 	}
 
+	targetContent := content
+	if merge != nil {
+		merged, mergeErr := merge(string(existing), content)
+		if mergeErr != nil {
+			return FilePreview{}, fmt.Errorf("merge %s: %w", filepath.Base(path), mergeErr)
+		}
+		targetContent = merged
+	}
+
 	status := FileStatusDifferent
-	if string(existing) == content {
+	if string(existing) == targetContent {
 		status = FileStatusSame
 	}
 
-	return FilePreview{Path: path, Status: status, Content: content}, nil
+	return FilePreview{Path: path, Status: status, Content: targetContent}, nil
 }

@@ -54,14 +54,14 @@ func WriteFiles(root string, compose string, dockerfile string) (Output, error) 
 		DockerignorePath: dockerignorePath,
 	}
 
-	composeStatus, composeBackup, err := writeManagedFile(root, composePath, "docker-compose-*.tmp", compose, mergeCompose)
+	composeStatus, composeBackup, err := writeManagedFile(root, composePath, "docker-compose-*.tmp", compose, MergeCompose)
 	if err != nil {
 		return Output{}, err
 	}
 	output.ComposeStatus = composeStatus
 	output.ComposeBackupPath = composeBackup
 
-	dockerfileStatus, dockerfileBackup, err := writeManagedFile(root, dockerfilePath, "dockerfile-*.tmp", dockerfile, mergeDockerfile)
+	dockerfileStatus, dockerfileBackup, err := writeManagedFile(root, dockerfilePath, "dockerfile-*.tmp", dockerfile, MergeDockerfile)
 	if err != nil {
 		return Output{}, err
 	}
@@ -144,7 +144,7 @@ func writeByTemp(root string, path string, pattern string, content string) error
 	return nil
 }
 
-func mergeCompose(existing string, generated string) (string, error) {
+func MergeCompose(existing string, generated string) (string, error) {
 	existingDoc := map[string]any{}
 	if err := yaml.Unmarshal([]byte(existing), &existingDoc); err != nil {
 		return "", err
@@ -160,7 +160,7 @@ func mergeCompose(existing string, generated string) (string, error) {
 		return generated, nil
 	}
 
-	if reflect.DeepEqual(existingDoc, mergedMap) {
+	if mapsEqual(existingDoc, mergedMap) {
 		return existing, nil
 	}
 
@@ -171,7 +171,7 @@ func mergeCompose(existing string, generated string) (string, error) {
 	return output, nil
 }
 
-func mergeDockerfile(existing string, generated string) (string, error) {
+func MergeDockerfile(existing string, generated string) (string, error) {
 	merged := strings.TrimRight(existing, "\n")
 	if merged == "" {
 		merged = existing
@@ -198,6 +198,15 @@ func mergeDockerfile(existing string, generated string) (string, error) {
 		merged += "\n"
 	}
 	return merged, nil
+}
+
+func mapsEqual(left map[string]any, right map[string]any) bool {
+	leftYAML, leftErr := marshalDeterministicYAML(left)
+	rightYAML, rightErr := marshalDeterministicYAML(right)
+	if leftErr != nil || rightErr != nil {
+		return false
+	}
+	return leftYAML == rightYAML
 }
 
 func deepMergeValue(existing any, generated any) any {

@@ -48,7 +48,7 @@ func readCatalogData(root string) ([]byte, error) {
 
 	exe, exeErr := os.Executable()
 	if exeErr != nil {
-		return nil, fmt.Errorf("read service catalog: %w", err)
+		return nil, fmt.Errorf("read service catalog: %w", exeErr)
 	}
 	secondary := filepath.Join(filepath.Dir(exe), "config", "services.json")
 	data, err = os.ReadFile(secondary)

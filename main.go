@@ -51,6 +51,9 @@ func parseArgs(args []string) (bool, app.Options, error) {
 	if fs.NArg() > 0 {
 		return false, app.Options{}, fmt.Errorf("unexpected arguments: %v", fs.Args())
 	}
+	if *versionFlag || *versionShortFlag {
+		return true, app.Options{}, nil
+	}
 
 	mode, err := app.ParseMode(*modeFlag)
 	if err != nil {
@@ -65,7 +68,7 @@ func parseArgs(args []string) (bool, app.Options, error) {
 		return false, app.Options{}, fmt.Errorf("--write and --dry-run cannot be used together")
 	}
 
-	return *versionFlag || *versionShortFlag, app.Options{
+	return false, app.Options{
 		Mode: mode,
 		Automation: app.AutomationOptions{
 			Services: parseServicesFlag(*servicesFlag),

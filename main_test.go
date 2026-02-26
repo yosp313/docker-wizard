@@ -52,3 +52,13 @@ func TestParseArgsRejectsWriteAndDryRun(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestParseArgsVersionIgnoresOtherFlags(t *testing.T) {
+	showVersion, _, err := parseArgs([]string{"--version", "--services", "mysql"})
+	if err != nil {
+		t.Fatalf("parse args: %v", err)
+	}
+	if !showVersion {
+		t.Fatal("expected showVersion true")
+	}
+}

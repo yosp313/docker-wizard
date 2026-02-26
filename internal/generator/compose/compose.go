@@ -110,24 +110,23 @@ func writeService(builder *strings.Builder, svc catalog.ServiceSpec) {
 		builder.WriteString("    image: " + svc.Image + "\n")
 	}
 	ports := append([]string(nil), svc.Ports...)
-	if len(ports) > 0 {
+	if len(ports) > 0 && svc.Public {
 		sort.Strings(ports)
-		if svc.Public {
-			builder.WriteString("    ports:\n")
-			for _, port := range ports {
+		builder.WriteString("    ports:\n")
+		for _, port := range ports {
+			builder.WriteString("      - \"" + port + "\"\n")
+		}
+	}
+	if !svc.Public {
+		expose := append([]string(nil), svc.Expose...)
+		if len(expose) == 0 && len(ports) > 0 {
+			expose = portsToExpose(ports)
+		}
+		if len(expose) > 0 {
+			sort.Strings(expose)
+			builder.WriteString("    expose:\n")
+			for _, port := range expose {
 				builder.WriteString("      - \"" + port + "\"\n")
-			}
-		} else {
-			expose := append([]string(nil), svc.Expose...)
-			if len(expose) == 0 {
-				expose = portsToExpose(ports)
-			}
-			if len(expose) > 0 {
-				sort.Strings(expose)
-				builder.WriteString("    expose:\n")
-				for _, port := range expose {
-					builder.WriteString("      - \"" + port + "\"\n")
-				}
 			}
 		}
 	}

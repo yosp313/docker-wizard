@@ -52,7 +52,7 @@ func readTemplateData(root string) ([]byte, error) {
 
 	exe, exeErr := os.Executable()
 	if exeErr != nil {
-		return nil, fmt.Errorf("read dockerfile catalog: %w", err)
+		return nil, fmt.Errorf("read dockerfile catalog: %w", exeErr)
 	}
 	secondary := filepath.Join(filepath.Dir(exe), "config", "dockerfiles.json")
 	data, err = os.ReadFile(secondary)

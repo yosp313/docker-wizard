@@ -64,6 +64,7 @@ func TestWriteFilesMergesDifferingExistingFiles(t *testing.T) {
 	dockerfilePath := filepath.Join(root, DockerfileFileName)
 	existingCompose := "" +
 		"version: \"3.9\"\n" +
+		"x-local: keep\n" +
 		"services:\n" +
 		"  custom:\n" +
 		"    image: busybox\n" +
@@ -121,13 +122,16 @@ func TestWriteFilesMergesDifferingExistingFiles(t *testing.T) {
 	}
 	mergedCompose := string(composeBytes)
 	if !strings.Contains(mergedCompose, "custom:") {
-		t.Fatalf("expected merged compose to keep existing custom service")
+		t.Fatalf("expected merged compose to preserve existing custom service")
 	}
 	if !strings.Contains(mergedCompose, "app:") {
 		t.Fatalf("expected merged compose to add generated app service")
 	}
 	if !strings.Contains(mergedCompose, "app-net:") {
 		t.Fatalf("expected merged compose to add generated network")
+	}
+	if !strings.Contains(mergedCompose, "x-local: keep") {
+		t.Fatalf("expected merged compose to preserve unmanaged root keys")
 	}
 
 	dockerfileBytes, err := os.ReadFile(dockerfilePath)
@@ -189,5 +193,48 @@ func TestWriteFilesMarksUnchangedFiles(t *testing.T) {
 	}
 	if out.DockerignoreStatus != WriteStatusUnchanged {
 		t.Fatalf("expected dockerignore unchanged, got %s", out.DockerignoreStatus)
+	}
+}
+
+func TestMergeComposePreservesExistingSections(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    ports:\n" +
+		"      - \"9999:8080\"\n" +
+		"  custom:\n" +
+		"    image: busybox\n" +
+		"x-local:\n" +
+		"  note: keep\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    ports:\n" +
+		"      - \"8080:8080\"\n" +
+		"networks:\n" +
+		"  app-net:\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "custom:") {
+		t.Fatalf("expected merged compose to preserve custom service")
+	}
+	if !strings.Contains(merged, "9999:8080") {
+		t.Fatalf("expected merged compose to preserve existing app ports")
+	}
+	if !strings.Contains(merged, "8080:8080") {
+		t.Fatalf("expected merged compose to add generated app ports")
+	}
+	if !strings.Contains(merged, "x-local:") {
+		t.Fatalf("expected merged compose to preserve unmanaged keys")
+	}
+	if !strings.Contains(merged, "app-net:") {
+		t.Fatalf("expected merged compose to include generated network")
 	}
 }
