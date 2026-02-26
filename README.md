@@ -1,9 +1,10 @@
 # Docker Wizard
 
-Docker Wizard is a Go TUI that scaffolds a Docker development stack for your project. It detects the primary language in your working directory, generates a matching `Dockerfile`, and generates a `docker-compose.yml` based on the services you select.
+Docker Wizard is a Go CLI/TUI tool that scaffolds a Docker development stack for your project. It detects the primary language in your working directory, generates a matching `Dockerfile`, and generates a `docker-compose.yml` based on the services you select.
 
 ## Features
 - Step-by-step wizard UI with a polished header/footer and animations
+- Multiple run modes for local and automation workflows (`styled`, `plain`, `cli`, `batch`)
 - Language + version detection with config-driven Dockerfile templates for Go, Node, Python, Ruby, PHP, Java, and .NET
 - Category-based service selection (databases, queues, cache, analytics, proxies)
 - Config-driven service catalog (edit `config/services.json`)
@@ -119,10 +120,17 @@ gofmt -w .
 ## Repository layout
 - `main.go`: CLI/TUI entry point
 - `internal/app`: application runtime
+- `internal/cli`: interactive and non-interactive CLI flows
 - `internal/generator`: language detection + compose/Dockerfile generation
 - `internal/tui`: wizard UI
 - `docs/knowledge-base.md`: product requirements and defaults
+- `docs/prd.md`: product requirements document
+- `docs/flow.md`: architecture diagram and module interaction map
+- `docs/mindmap.md`: flow-oriented process map
 
 ## Documentation
 - Knowledge base: `docs/knowledge-base.md`
+- PRD: `docs/prd.md`
+- Architecture diagram: `docs/flow.md`
+- Flow map: `docs/mindmap.md`
 - Agent guidance: `AGENTS.md`
