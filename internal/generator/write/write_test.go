@@ -238,3 +238,110 @@ func TestMergeComposePreservesExistingSections(t *testing.T) {
 		t.Fatalf("expected merged compose to include generated network")
 	}
 }
+
+func TestMergeComposeEnvironmentKeepsExistingValues(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    environment:\n" +
+		"      - APP_ENV=local\n" +
+		"      - LOG_LEVEL=debug\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    environment:\n" +
+		"      - APP_ENV=production\n" +
+		"      - PORT=8080\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "APP_ENV=local") {
+		t.Fatalf("expected existing APP_ENV to be preserved")
+	}
+	if strings.Contains(merged, "APP_ENV=production") {
+		t.Fatalf("expected generated APP_ENV override to be skipped")
+	}
+	if !strings.Contains(merged, "PORT=8080") {
+		t.Fatalf("expected generated PORT env to be added")
+	}
+}
+
+func TestMergeComposePortsKeepExistingHostBindings(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    ports:\n" +
+		"      - \"8080:8080\"\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    ports:\n" +
+		"      - \"8080:81\"\n" +
+		"      - \"5432:5432\"\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "8080:8080") {
+		t.Fatalf("expected existing 8080 binding to be preserved")
+	}
+	if strings.Contains(merged, "8080:81") {
+		t.Fatalf("expected generated conflicting 8080 binding to be skipped")
+	}
+	if !strings.Contains(merged, "5432:5432") {
+		t.Fatalf("expected non-conflicting generated port to be added")
+	}
+}
+
+func TestMergeComposeServiceListsUnion(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    depends_on:\n" +
+		"      - redis\n" +
+		"    networks:\n" +
+		"      - app-net\n" +
+		"    volumes:\n" +
+		"      - app-data:/data\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    depends_on:\n" +
+		"      - redis\n" +
+		"      - postgres\n" +
+		"    networks:\n" +
+		"      - app-net\n" +
+		"      - internal-net\n" +
+		"    volumes:\n" +
+		"      - app-data:/data\n" +
+		"      - logs:/logs\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "- postgres") {
+		t.Fatalf("expected depends_on to include generated postgres")
+	}
+	if !strings.Contains(merged, "- internal-net") {
+		t.Fatalf("expected networks to include generated internal-net")
+	}
+	if !strings.Contains(merged, "- logs:/logs") {
+		t.Fatalf("expected volumes to include generated logs mount")
+	}
+}

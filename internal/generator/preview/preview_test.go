@@ -76,3 +76,51 @@ func TestPreviewFilesMarksSameWhenMergedDockerfileUnchanged(t *testing.T) {
 		t.Fatalf("expected dockerfile status same after merge, got %s", preview.Dockerfile.Status)
 	}
 }
+
+func TestPreviewFilesComposeReflectsEnvironmentAndPortConflictMerge(t *testing.T) {
+	root := t.TempDir()
+
+	existingCompose := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    environment:\n" +
+		"      - APP_ENV=local\n" +
+		"    ports:\n" +
+		"      - \"8080:8080\"\n"
+	if err := os.WriteFile(filepath.Join(root, write.ComposeFileName), []byte(existingCompose), 0o644); err != nil {
+		t.Fatalf("write compose: %v", err)
+	}
+
+	generatedCompose := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    environment:\n" +
+		"      - APP_ENV=production\n" +
+		"      - PORT=8080\n" +
+		"    ports:\n" +
+		"      - \"8080:81\"\n" +
+		"      - \"5432:5432\"\n"
+
+	preview, err := PreviewFiles(root, generatedCompose, "FROM alpine:3.20\n")
+	if err != nil {
+		t.Fatalf("preview files: %v", err)
+	}
+
+	if !strings.Contains(preview.Compose.Content, "APP_ENV=local") {
+		t.Fatalf("expected preview to preserve existing APP_ENV")
+	}
+	if strings.Contains(preview.Compose.Content, "APP_ENV=production") {
+		t.Fatalf("expected preview to skip generated APP_ENV override")
+	}
+	if !strings.Contains(preview.Compose.Content, "8080:8080") {
+		t.Fatalf("expected preview to preserve existing 8080 mapping")
+	}
+	if strings.Contains(preview.Compose.Content, "8080:81") {
+		t.Fatalf("expected preview to skip conflicting generated 8080 mapping")
+	}
+	if !strings.Contains(preview.Compose.Content, "5432:5432") {
+		t.Fatalf("expected preview to include non-conflicting generated mapping")
+	}
+}

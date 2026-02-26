@@ -96,6 +96,13 @@ Key pain points:
 - Merge differing existing files.
 - Save backups of differing files as `*.bak`.
 - Create `.dockerignore` only if missing.
+- Merge policy is user-priority: preserve existing values and add generated values when missing.
+- Compose merge rules:
+  - `services.*.environment` key-aware merge for list syntax (`KEY=VALUE`), existing value wins.
+  - `services.*.ports` host-port-aware merge, existing host binding wins.
+  - `services.*.depends_on`, `services.*.networks`, `services.*.volumes` existing-first set union.
+  - Environment map syntax (`KEY: VALUE`) is out of scope for key-aware merging in this version.
+- Preview must use the same merge logic as write so status/content matches write results.
 
 ### 7.5 Modes and interface
 - Support run modes: `styled`, `plain`, `cli`, `batch`.

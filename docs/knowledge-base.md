@@ -63,6 +63,13 @@
 - Existing differing files are merged and marked updated
 - Existing differing file contents are backed up to `*.bak`
 - `.dockerignore` is created only when missing
+- Merge is user-priority: existing values are preserved and generated values are additive
+- Compose list merge rules:
+  - `services.*.environment` merges by env key for list form (`KEY=VALUE`), existing value wins
+  - `services.*.ports` merges by host port, existing host binding wins
+  - `services.*.depends_on`, `services.*.networks`, `services.*.volumes` are existing-first set unions
+  - Environment map form (`KEY: VALUE`) is not key-aware merged yet
+- Preview uses the same merge functions as write for parity
 
 ## Detection rules
 ### Language detection priority

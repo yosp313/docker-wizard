@@ -60,6 +60,7 @@ Key behavior:
 - Service selection is category-based and progresses in fixed order.
 - Review can transition to preview, then generate.
 - Errors are represented as a dedicated step with retry/back options.
+- Key handling is split by step-specific handlers to keep state transitions readable and testable.
 
 ### 4.2 CLI interactive
 - Entrypoint: `internal/cli/RunInteractive`
@@ -127,12 +128,17 @@ Key behavior:
 
 ### 5.8 Preview and write
 - `internal/generator/preview/preview.go`
-  - Compares generated content with existing files.
+  - Compares merged target content with existing files.
   - Produces per-file status (`new`, `same`, `different`, `exists`).
 - `internal/generator/write/write.go`
   - Writes files via temp-file and atomic rename pattern.
   - Merge behavior:
-    - Compose: YAML deep merge preserving existing keys and adding generated keys.
+    - Compose: user-priority YAML merge preserving existing keys/values and adding generated keys when missing.
+    - Compose list semantics:
+      - `services.*.environment` list entries merge by env key (`KEY=VALUE`), existing value wins.
+      - `services.*.ports` merge by host port, existing host binding wins.
+      - `services.*.depends_on`, `services.*.networks`, and `services.*.volumes` use existing-first set union.
+      - `environment` map form (`KEY: VALUE`) is not key-aware merged in current version.
     - Dockerfile: preserve existing content; inject `ENV APP_START_CMD` and `CMD` only when needed.
   - Creates backups (`.bak`) for differing existing files.
   - Creates `.dockerignore` only when missing.
@@ -166,6 +172,7 @@ Idempotent behaviors:
 - Re-running with same inputs should produce unchanged statuses.
 - Existing identical files remain untouched.
 - Existing differing files are updated in a controlled merge path with backups.
+- Preview and write share merge logic, so preview status/content aligns with actual write outcomes.
 
 ## 8. Error handling model
 - Validation and runtime functions return errors instead of panicking.

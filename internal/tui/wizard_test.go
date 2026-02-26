@@ -170,3 +170,20 @@ func TestActivePreviewTabContentExistsStatus(t *testing.T) {
 		t.Fatalf("expected exists message, got %q", got)
 	}
 }
+
+func TestHandleKey_ReviewEnterBlockedByBlockers(t *testing.T) {
+	m := model{
+		step:     stepReview,
+		blockers: []string{"missing required field"},
+		selected: map[string]bool{},
+	}
+
+	cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if cmd != nil {
+		t.Fatalf("expected no command while blockers exist")
+	}
+	if m.step != stepReview {
+		t.Fatalf("expected step to remain review, got %v", m.step)
+	}
+}

@@ -154,7 +154,7 @@ func MergeCompose(existing string, generated string) (string, error) {
 		return "", err
 	}
 
-	merged := deepMergeValue(existingDoc, generatedDoc)
+	merged := deepMergeComposeValue(nil, existingDoc, generatedDoc)
 	mergedMap, ok := merged.(map[string]any)
 	if !ok {
 		return generated, nil
@@ -209,7 +209,7 @@ func mapsEqual(left map[string]any, right map[string]any) bool {
 	return leftYAML == rightYAML
 }
 
-func deepMergeValue(existing any, generated any) any {
+func deepMergeComposeValue(path []string, existing any, generated any) any {
 	switch existingTyped := existing.(type) {
 	case map[string]any:
 		generatedMap, ok := generated.(map[string]any)
@@ -226,7 +226,7 @@ func deepMergeValue(existing any, generated any) any {
 				out[key] = deepCopy(generatedValue)
 				continue
 			}
-			out[key] = deepMergeValue(existingValue, generatedValue)
+			out[key] = deepMergeComposeValue(appendComposePath(path, key), existingValue, generatedValue)
 		}
 		return out
 	case []any:
@@ -234,23 +234,150 @@ func deepMergeValue(existing any, generated any) any {
 		if !ok {
 			return deepCopy(existing)
 		}
-		out := make([]any, 0, len(existingTyped)+len(generatedSlice))
-		for _, value := range existingTyped {
-			out = append(out, deepCopy(value))
-		}
-		for _, generatedValue := range generatedSlice {
-			if containsDeepValue(out, generatedValue) {
-				continue
-			}
-			out = append(out, deepCopy(generatedValue))
-		}
-		return out
+		return mergeComposeSlice(path, existingTyped, generatedSlice)
 	default:
 		if existing == nil {
 			return deepCopy(generated)
 		}
 		return deepCopy(existing)
 	}
+}
+
+func appendComposePath(path []string, key string) []string {
+	next := make([]string, 0, len(path)+1)
+	next = append(next, path...)
+	next = append(next, key)
+	return next
+}
+
+func mergeComposeSlice(path []string, existing []any, generated []any) []any {
+	if isServiceField(path, "environment") {
+		return mergeEnvironmentList(existing, generated)
+	}
+	if isServiceField(path, "ports") {
+		return mergePortsList(existing, generated)
+	}
+	if isServiceField(path, "depends_on") || isServiceField(path, "networks") || isServiceField(path, "volumes") {
+		return mergeSetLikeList(existing, generated)
+	}
+	return mergeSetLikeList(existing, generated)
+}
+
+func isServiceField(path []string, field string) bool {
+	return len(path) == 3 && path[0] == "services" && path[2] == field
+}
+
+func mergeEnvironmentList(existing []any, generated []any) []any {
+	out := make([]any, 0, len(existing)+len(generated))
+	seenKeys := map[string]bool{}
+
+	for _, value := range existing {
+		out = append(out, deepCopy(value))
+		if key, ok := environmentKey(value); ok {
+			seenKeys[key] = true
+		}
+	}
+
+	for _, generatedValue := range generated {
+		if key, ok := environmentKey(generatedValue); ok {
+			if seenKeys[key] {
+				continue
+			}
+			seenKeys[key] = true
+			out = append(out, deepCopy(generatedValue))
+			continue
+		}
+		if containsDeepValue(out, generatedValue) {
+			continue
+		}
+		out = append(out, deepCopy(generatedValue))
+	}
+
+	return out
+}
+
+func environmentKey(value any) (string, bool) {
+	entry, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+	entry = strings.TrimSpace(entry)
+	if entry == "" {
+		return "", false
+	}
+	if idx := strings.Index(entry, "="); idx >= 0 {
+		key := strings.TrimSpace(entry[:idx])
+		if key == "" {
+			return "", false
+		}
+		return key, true
+	}
+	return entry, true
+}
+
+func mergePortsList(existing []any, generated []any) []any {
+	out := make([]any, 0, len(existing)+len(generated))
+	hostPorts := map[string]bool{}
+
+	for _, value := range existing {
+		out = append(out, deepCopy(value))
+		if host, ok := portHostKey(value); ok {
+			hostPorts[host] = true
+		}
+	}
+
+	for _, generatedValue := range generated {
+		if host, ok := portHostKey(generatedValue); ok {
+			if hostPorts[host] {
+				continue
+			}
+			hostPorts[host] = true
+			out = append(out, deepCopy(generatedValue))
+			continue
+		}
+		if containsDeepValue(out, generatedValue) {
+			continue
+		}
+		out = append(out, deepCopy(generatedValue))
+	}
+
+	return out
+}
+
+func portHostKey(value any) (string, bool) {
+	entry, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+	entry = strings.TrimSpace(entry)
+	if entry == "" {
+		return "", false
+	}
+
+	withoutProtocol := strings.SplitN(entry, "/", 2)[0]
+	parts := strings.Split(withoutProtocol, ":")
+	if len(parts) < 2 {
+		return "", false
+	}
+	host := strings.TrimSpace(parts[len(parts)-2])
+	if host == "" {
+		return "", false
+	}
+	return host, true
+}
+
+func mergeSetLikeList(existing []any, generated []any) []any {
+	out := make([]any, 0, len(existing)+len(generated))
+	for _, value := range existing {
+		out = append(out, deepCopy(value))
+	}
+	for _, generatedValue := range generated {
+		if containsDeepValue(out, generatedValue) {
+			continue
+		}
+		out = append(out, deepCopy(generatedValue))
+	}
+	return out
 }
 
 func containsDeepValue(values []any, target any) bool {

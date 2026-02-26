@@ -9,7 +9,7 @@ Docker Wizard is a Go CLI/TUI tool that scaffolds a Docker development stack for
 - Category-based service selection (databases, queues, cache, analytics, proxies)
 - Config-driven service catalog (edit `config/services.json`)
 - Deterministic, reproducible compose output
-- Safe file generation with merge mode (creates missing files and merges differing existing files)
+- Safe file generation with user-priority merge mode (creates missing files and merges differing existing files)
 
 ## Quick start
 ```bash
@@ -73,9 +73,16 @@ Batch mode flags:
 
 When generated files already exist:
 - Matching files are left as-is
-- Differing files are merged with generated output
+- Differing files are merged with user content taking priority
 - Original differing files are backed up as `*.bak`
 - The result screen reports `created`, `updated`, or `unchanged` per file
+
+Compose merge behavior (user-priority):
+- Existing keys/values are preserved; generated keys are added when missing
+- `services.*.environment` merges by env key for list syntax (`- KEY=VALUE`), existing value wins
+- `services.*.ports` merges by host port, existing host binding wins
+- `services.*.depends_on`, `services.*.networks`, and `services.*.volumes` are existing-first set unions
+- `environment` map syntax (`KEY: VALUE`) is not merged key-aware yet
 
 ## Releases
 - Every push to `main` runs CI (`gofmt` check, `go vet`, `go test`, `go build`).
@@ -98,6 +105,7 @@ When generated files already exist:
 - Only services marked `public` in `config/services.json` publish host ports.
 - Existing identical files are left unchanged.
 - Existing differing files are merged and backed up as `*.bak`.
+- Preview uses the same merge functions as write, so preview status/content matches write behavior.
 
 ## Dockerfile defaults
 - Generated templates set `APP_START_CMD` and run `CMD ["sh", "-lc", "$APP_START_CMD"]`.
