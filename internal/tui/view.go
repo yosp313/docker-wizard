@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"docker-wizard/internal/generator"
+	"docker-wizard/internal/utils"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -305,12 +306,12 @@ func (m model) viewReview() string {
 		"",
 	}
 
-	for _, category := range categoryOrder() {
+	for _, category := range utils.CategoryOrder() {
 		labels := groups[category]
 		if len(labels) == 0 {
 			labels = []string{"none"}
 		}
-		body = append(body, fmt.Sprintf("%s:", categoryLabel(category)))
+		body = append(body, fmt.Sprintf("%s:", utils.CategoryLabel(category)))
 		body = append(body, "- "+strings.Join(labels, "\n- "))
 		body = append(body, "")
 	}

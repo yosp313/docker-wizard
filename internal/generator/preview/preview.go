@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"docker-wizard/internal/generator/write"
+	"docker-wizard/internal/utils"
 )
 
 type FileStatus string
@@ -48,7 +49,7 @@ func PreviewFiles(root string, compose string, dockerfile string) (Preview, erro
 	}
 
 	dockerignorePreview := FilePreview{Path: dockerignorePath, Status: FileStatusExists}
-	if !fileExists(dockerignorePath) {
+	if !utils.FileExists(dockerignorePath) {
 		dockerignorePreview = FilePreview{
 			Path:    dockerignorePath,
 			Status:  FileStatusNew,
@@ -64,7 +65,7 @@ func PreviewFiles(root string, compose string, dockerfile string) (Preview, erro
 }
 
 func buildFilePreview(path string, content string) (FilePreview, error) {
-	if !fileExists(path) {
+	if !utils.FileExists(path) {
 		return FilePreview{Path: path, Status: FileStatusNew, Content: content}, nil
 	}
 
@@ -79,12 +80,4 @@ func buildFilePreview(path string, content string) (FilePreview, error) {
 	}
 
 	return FilePreview{Path: path, Status: status, Content: content}, nil
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
 }

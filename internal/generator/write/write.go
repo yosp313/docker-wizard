@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"docker-wizard/internal/utils"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -66,7 +68,7 @@ func WriteFiles(root string, compose string, dockerfile string) (Output, error) 
 	output.DockerfileStatus = dockerfileStatus
 	output.DockerfileBackupPath = dockerfileBackup
 
-	if !fileExists(dockerignorePath) {
+	if !utils.FileExists(dockerignorePath) {
 		if err := os.WriteFile(dockerignorePath, []byte(DefaultDockerignore()), 0644); err != nil {
 			return Output{}, fmt.Errorf("write dockerignore: %w", err)
 		}
@@ -389,12 +391,4 @@ func writeTempFile(root string, pattern string, content string) (string, error) 
 	}
 
 	return path, nil
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
 }

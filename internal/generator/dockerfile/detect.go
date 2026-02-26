@@ -2,8 +2,9 @@ package dockerfile
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
+
+	"docker-wizard/internal/utils"
 )
 
 type Language string
@@ -55,26 +56,26 @@ func DetectLanguage(root string) (LanguageDetails, error) {
 
 	details := LanguageDetails{}
 
-	details.HasGoMod = fileExists(filepath.Join(root, "go.mod"))
-	details.HasGoSum = fileExists(filepath.Join(root, "go.sum"))
+	details.HasGoMod = utils.FileExists(filepath.Join(root, "go.mod"))
+	details.HasGoSum = utils.FileExists(filepath.Join(root, "go.sum"))
 
-	details.HasPackageJSON = fileExists(filepath.Join(root, "package.json"))
-	details.HasPackageLock = fileExists(filepath.Join(root, "package-lock.json"))
-	details.HasYarnLock = fileExists(filepath.Join(root, "yarn.lock"))
-	details.HasPnpmLock = fileExists(filepath.Join(root, "pnpm-lock.yaml"))
+	details.HasPackageJSON = utils.FileExists(filepath.Join(root, "package.json"))
+	details.HasPackageLock = utils.FileExists(filepath.Join(root, "package-lock.json"))
+	details.HasYarnLock = utils.FileExists(filepath.Join(root, "yarn.lock"))
+	details.HasPnpmLock = utils.FileExists(filepath.Join(root, "pnpm-lock.yaml"))
 
-	details.HasRequirements = fileExists(filepath.Join(root, "requirements.txt"))
-	details.HasPyProject = fileExists(filepath.Join(root, "pyproject.toml"))
-	details.HasPipfile = fileExists(filepath.Join(root, "Pipfile"))
+	details.HasRequirements = utils.FileExists(filepath.Join(root, "requirements.txt"))
+	details.HasPyProject = utils.FileExists(filepath.Join(root, "pyproject.toml"))
+	details.HasPipfile = utils.FileExists(filepath.Join(root, "Pipfile"))
 
-	details.HasGemfile = fileExists(filepath.Join(root, "Gemfile"))
-	details.HasGemfileLock = fileExists(filepath.Join(root, "Gemfile.lock"))
-	details.HasComposerJSON = fileExists(filepath.Join(root, "composer.json"))
-	details.HasPHPVersion = fileExists(filepath.Join(root, ".php-version"))
+	details.HasGemfile = utils.FileExists(filepath.Join(root, "Gemfile"))
+	details.HasGemfileLock = utils.FileExists(filepath.Join(root, "Gemfile.lock"))
+	details.HasComposerJSON = utils.FileExists(filepath.Join(root, "composer.json"))
+	details.HasPHPVersion = utils.FileExists(filepath.Join(root, ".php-version"))
 
-	details.HasPomXML = fileExists(filepath.Join(root, "pom.xml"))
-	details.HasGradle = fileExists(filepath.Join(root, "build.gradle"))
-	details.HasGradleKts = fileExists(filepath.Join(root, "build.gradle.kts"))
+	details.HasPomXML = utils.FileExists(filepath.Join(root, "pom.xml"))
+	details.HasGradle = utils.FileExists(filepath.Join(root, "build.gradle"))
+	details.HasGradleKts = utils.FileExists(filepath.Join(root, "build.gradle.kts"))
 
 	csproj, err := filepath.Glob(filepath.Join(root, "*.csproj"))
 	if err != nil {
@@ -113,14 +114,6 @@ func DetectLanguage(root string) (LanguageDetails, error) {
 	}
 
 	return details, nil
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
 }
 
 func trimExt(name string) string {

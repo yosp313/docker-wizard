@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"docker-wizard/internal/utils"
 )
 
 type ServiceCatalog struct {
@@ -99,7 +101,7 @@ func normalizeCatalog(catalog *ServiceCatalog) error {
 
 func validCategory(category string) bool {
 	switch category {
-	case "database", "message-queue", "cache", "analytics", "proxy":
+	case utils.CategoryDatabase, utils.CategoryMessageQueue, utils.CategoryCache, utils.CategoryAnalytics, utils.CategoryProxy:
 		return true
 	default:
 		return false

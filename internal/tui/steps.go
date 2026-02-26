@@ -2,6 +2,8 @@ package tui
 
 import "docker-wizard/internal/generator"
 
+import "docker-wizard/internal/utils"
+
 func (m *model) toggleCurrentSelection() {
 	services := m.filteredServices(m.step)
 	if len(services) == 0 {
@@ -46,15 +48,15 @@ func (m model) selectedByCategory() map[string][]string {
 func stepCategory(current step) string {
 	switch current {
 	case stepDatabase:
-		return "database"
+		return utils.CategoryDatabase
 	case stepMessageQueue:
-		return "message-queue"
+		return utils.CategoryMessageQueue
 	case stepCache:
-		return "cache"
+		return utils.CategoryCache
 	case stepAnalytics:
-		return "analytics"
+		return utils.CategoryAnalytics
 	case stepProxy:
-		return "proxy"
+		return utils.CategoryProxy
 	default:
 		return ""
 	}
@@ -75,27 +77,6 @@ func stepTitle(current step) string {
 	default:
 		return "Services"
 	}
-}
-
-func categoryLabel(category string) string {
-	switch category {
-	case "database":
-		return "Databases"
-	case "message-queue":
-		return "Message Queues"
-	case "cache":
-		return "Caching"
-	case "analytics":
-		return "Analytics"
-	case "proxy":
-		return "Webservers / Proxies"
-	default:
-		return category
-	}
-}
-
-func categoryOrder() []string {
-	return []string{"database", "message-queue", "cache", "analytics", "proxy"}
 }
 
 func defaultLanguageOptions() []languageChoice {
@@ -221,60 +202,20 @@ func serviceChoicesFromCatalog(services []generator.ServiceSpec) []serviceChoice
 	return choices
 }
 
-func selectedServiceIDs(services []serviceChoice, selected map[string]bool) []string {
-	ids := make([]string, 0, len(services))
-	for _, svc := range services {
-		if selected[svc.ID] {
-			ids = append(ids, svc.ID)
-		}
-	}
-	return ids
-}
-
-func languageLabel(lang generator.Language) string {
-	switch lang {
-	case generator.LanguageGo:
-		return "Go"
-	case generator.LanguageNode:
-		return "Node"
-	case generator.LanguagePython:
-		return "Python"
-	case generator.LanguageRuby:
-		return "Ruby"
-	case generator.LanguagePHP:
-		return "PHP"
-	case generator.LanguageJava:
-		return "Java"
-	case generator.LanguageDotNet:
-		return ".NET"
-	case generator.LanguageUnknown:
-		return "Unknown"
-	default:
-		return string(lang)
-	}
-}
-
 func languageLabelWithVersion(details generator.LanguageDetails) string {
-	base := languageLabel(details.Type)
-	version := ""
-	switch details.Type {
-	case generator.LanguageGo:
-		version = details.GoVersion
-	case generator.LanguageNode:
-		version = details.NodeVersion
-	case generator.LanguagePython:
-		version = details.PythonVersion
-	case generator.LanguageRuby:
-		version = details.RubyVersion
-	case generator.LanguagePHP:
-		version = details.PHPVersion
-	case generator.LanguageJava:
-		version = details.JavaVersion
-	case generator.LanguageDotNet:
-		version = details.DotNetVersion
-	}
-	if version == "" {
-		return base
-	}
-	return base + " " + version
+	return utils.LanguageLabelWithVersion(string(details.Type), utils.LanguageVersions{
+		Go:     details.GoVersion,
+		Node:   details.NodeVersion,
+		Python: details.PythonVersion,
+		Ruby:   details.RubyVersion,
+		PHP:    details.PHPVersion,
+		Java:   details.JavaVersion,
+		DotNet: details.DotNetVersion,
+	})
+}
+
+func selectedServiceIDs(services []serviceChoice, selected map[string]bool) []string {
+	return utils.OrderedSelectedIDs(services, func(svc serviceChoice) string {
+		return svc.ID
+	}, selected)
 }

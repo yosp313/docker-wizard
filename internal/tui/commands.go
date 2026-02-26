@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -165,15 +164,6 @@ func lineCount(content string) int {
 	}
 	return strings.Count(content, "\n") + 1
 }
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
-}
-
 func baseName(path string) string {
 	if path == "" {
 		return ""
