@@ -125,12 +125,12 @@ gofmt -w .
 - `internal/tui`: wizard UI
 - `docs/knowledge-base.md`: product requirements and defaults
 - `docs/prd.md`: product requirements document
+- `docs/trd.md`: technical requirements and design document
 - `docs/flow.md`: architecture diagram and module interaction map
-- `docs/mindmap.md`: flow-oriented process map
 
 ## Documentation
 - Knowledge base: `docs/knowledge-base.md`
 - PRD: `docs/prd.md`
+- TRD: `docs/trd.md`
 - Architecture diagram: `docs/flow.md`
-- Flow map: `docs/mindmap.md`
 - Agent guidance: `AGENTS.md`
