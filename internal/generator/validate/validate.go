@@ -37,6 +37,7 @@ func SelectionWarnings(root string, selection compose.ComposeSelection) ([]strin
 	warnings := []string{}
 	warnings = append(warnings, dependencyWarnings(selected, serviceMap)...)
 	warnings = append(warnings, portCollisionWarnings(selected, serviceMap)...)
+	warnings = append(warnings, insecureDefaultWarnings(selected, serviceMap)...)
 	sort.Strings(warnings)
 	return warnings, nil
 }
@@ -135,10 +136,71 @@ func hostPort(port string) string {
 	case 0:
 		return ""
 	case 1:
-		return parts[0]
+		return ""
 	case 2:
 		return parts[0]
 	default:
 		return parts[len(parts)-2]
 	}
+}
+
+func insecureDefaultWarnings(selected map[string]bool, services map[string]catalog.ServiceSpec) []string {
+	warnings := []string{}
+	for id := range selected {
+		svc, ok := services[id]
+		if !ok {
+			continue
+		}
+
+		label := serviceDisplayName(svc)
+		for _, env := range svc.Env {
+			if insecureEnvDefault(env) {
+				warnings = append(warnings, fmt.Sprintf("%s includes placeholder environment defaults; update them before sharing or exposing this stack", label))
+				break
+			}
+		}
+
+		for _, arg := range svc.Command {
+			trimmed := strings.TrimSpace(strings.ToLower(arg))
+			if trimmed == "--api.insecure=true" {
+				warnings = append(warnings, fmt.Sprintf("%s enables an insecure admin API flag (--api.insecure=true)", label))
+				break
+			}
+		}
+	}
+
+	return dedupeStrings(warnings)
+}
+
+func insecureEnvDefault(entry string) bool {
+	entry = strings.TrimSpace(entry)
+	if entry == "" {
+		return false
+	}
+	idx := strings.Index(entry, "=")
+	if idx < 0 || idx == len(entry)-1 {
+		return false
+	}
+	value := strings.ToLower(strings.TrimSpace(entry[idx+1:]))
+	if value == "" {
+		return false
+	}
+
+	return strings.Contains(value, "change-me") || strings.Contains(value, "example")
+}
+
+func dedupeStrings(values []string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
 }

@@ -90,11 +90,11 @@ CONFIG_DIR="$INSTALL_ROOT/config"
 mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$LINK_DIR"
 
 printf '%s\n' "Building docker-wizard"
-build_flags=""
 if [ -n "$REF" ]; then
-  build_flags="-ldflags=-X=main.version=$REF"
+  (cd "$src_dir" && go build -ldflags "-X main.version=$REF" -o "$BIN_DIR/docker-wizard" .)
+else
+  (cd "$src_dir" && go build -o "$BIN_DIR/docker-wizard" .)
 fi
-(cd "$src_dir" && go build $build_flags -o "$BIN_DIR/docker-wizard" .)
 
 if [ ! -f "$src_dir/config/services.json" ]; then
   printf '%s\n' "missing config/services.json in source" >&2

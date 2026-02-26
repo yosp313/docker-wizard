@@ -345,3 +345,123 @@ func TestMergeComposeServiceListsUnion(t *testing.T) {
 		t.Fatalf("expected volumes to include generated logs mount")
 	}
 }
+
+func TestMergeComposeCommandUsesUserPriority(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  traefik:\n" +
+		"    command:\n" +
+		"      - --api.insecure=true\n" +
+		"      - --providers.file.directory=/etc/traefik/dynamic\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  traefik:\n" +
+		"    command:\n" +
+		"      - --api.dashboard=true\n" +
+		"      - --providers.docker=true\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "--api.insecure=true") {
+		t.Fatalf("expected existing command arguments to be preserved")
+	}
+	if strings.Contains(merged, "--api.dashboard=true") {
+		t.Fatalf("expected generated command arguments to be skipped when existing command is present")
+	}
+	if strings.Contains(merged, "--providers.docker=true") {
+		t.Fatalf("expected generated command arguments to be skipped when existing command is present")
+	}
+}
+
+func TestMergeComposeCommandAdoptsGeneratedWhenExistingEmpty(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  traefik:\n" +
+		"    image: traefik:v2.11\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  traefik:\n" +
+		"    image: traefik:v2.11\n" +
+		"    command:\n" +
+		"      - --api.dashboard=true\n" +
+		"      - --providers.docker=true\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "--api.dashboard=true") {
+		t.Fatalf("expected generated command to be adopted when existing command is absent")
+	}
+	if !strings.Contains(merged, "--providers.docker=true") {
+		t.Fatalf("expected generated command to be adopted when existing command is absent")
+	}
+}
+
+func TestMergeComposeEntrypointUsesUserPriority(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    entrypoint:\n" +
+		"      - /custom-entrypoint.sh\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    entrypoint:\n" +
+		"      - /docker-entrypoint.sh\n" +
+		"      - run\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "/custom-entrypoint.sh") {
+		t.Fatalf("expected existing entrypoint to be preserved")
+	}
+	if strings.Contains(merged, "/docker-entrypoint.sh") {
+		t.Fatalf("expected generated entrypoint to be skipped when existing entrypoint is present")
+	}
+}
+
+func TestMergeComposeEntrypointAdoptsGeneratedWhenExistingEmpty(t *testing.T) {
+	existing := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    image: busybox\n"
+
+	generated := "" +
+		"version: \"3.9\"\n" +
+		"services:\n" +
+		"  app:\n" +
+		"    image: busybox\n" +
+		"    entrypoint:\n" +
+		"      - /docker-entrypoint.sh\n" +
+		"      - run\n"
+
+	merged, err := MergeCompose(existing, generated)
+	if err != nil {
+		t.Fatalf("merge compose: %v", err)
+	}
+
+	if !strings.Contains(merged, "/docker-entrypoint.sh") {
+		t.Fatalf("expected generated entrypoint to be adopted when existing entrypoint is absent")
+	}
+	if !strings.Contains(merged, "- run") {
+		t.Fatalf("expected generated entrypoint arguments to be adopted when existing entrypoint is absent")
+	}
+}

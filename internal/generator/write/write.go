@@ -257,10 +257,29 @@ func mergeComposeSlice(path []string, existing []any, generated []any) []any {
 	if isServiceField(path, "ports") {
 		return mergePortsList(existing, generated)
 	}
+	if isServiceField(path, "command") || isServiceField(path, "entrypoint") {
+		return mergeUserPriorityList(existing, generated)
+	}
 	if isServiceField(path, "depends_on") || isServiceField(path, "networks") || isServiceField(path, "volumes") {
 		return mergeSetLikeList(existing, generated)
 	}
 	return mergeSetLikeList(existing, generated)
+}
+
+func mergeUserPriorityList(existing []any, generated []any) []any {
+	if len(existing) > 0 {
+		out := make([]any, 0, len(existing))
+		for _, value := range existing {
+			out = append(out, deepCopy(value))
+		}
+		return out
+	}
+
+	out := make([]any, 0, len(generated))
+	for _, value := range generated {
+		out = append(out, deepCopy(value))
+	}
+	return out
 }
 
 func isServiceField(path []string, field string) bool {
