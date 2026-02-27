@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"docker-wizard/internal/generator"
+	"docker-wizard/internal/tui/wizard/ui"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -133,7 +134,7 @@ func (m *model) previewContentHeight() int {
 }
 
 func (m *model) previewContentWidth() int {
-	available := contentWidth(m.width) - 6
+	available := ui.ContentWidth(m.width) - 6
 	if available < 20 {
 		return 20
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"docker-wizard/internal/generator"
+	"docker-wizard/internal/tui/wizard/ui"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -34,7 +35,7 @@ func Run(root string) error {
 		selected:     map[string]bool{},
 		langOptions:  defaultLanguageOptions(),
 	}
-	setSpinner(&m.spinner)
+	ui.ConfigureSpinner(&m.spinner)
 
 	program := tea.NewProgram(m, tea.WithAltScreen())
 	_, err = program.Run()

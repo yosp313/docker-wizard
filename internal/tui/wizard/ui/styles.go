@@ -1,4 +1,4 @@
-package wizard
+package ui
 
 import (
 	"fmt"
@@ -12,7 +12,6 @@ import (
 const (
 	paletteBg     = lipgloss.Color("#1a1b26")
 	palettePanel  = lipgloss.Color("#1f2335")
-	palettePanel2 = lipgloss.Color("#24283b")
 	paletteBorder = lipgloss.Color("#3b4261")
 	paletteText   = lipgloss.Color("#c0caf5")
 	paletteMuted  = lipgloss.Color("#565f89")
@@ -22,13 +21,6 @@ const (
 	paletteYellow = lipgloss.Color("#e0af68")
 	paletteRed    = lipgloss.Color("#f7768e")
 	maxContentW   = 120
-)
-
-type RenderMode string
-
-const (
-	RenderModeStyled RenderMode = "styled"
-	RenderModePlain  RenderMode = "plain"
 )
 
 var currentRenderMode = RenderModeStyled
@@ -42,11 +34,15 @@ func SetRenderMode(mode RenderMode) {
 	}
 }
 
-func isPlainMode() bool {
-	return currentRenderMode == RenderModePlain
+func ConfigureSpinner(sp *spinner.Model) {
+	sp.Spinner = spinner.Line
+	if isPlainMode() {
+		return
+	}
+	sp.Style = lipgloss.NewStyle().Foreground(paletteAccent)
 }
 
-func contentWidth(width int) int {
+func ContentWidth(width int) int {
 	if width <= 0 {
 		return 80
 	}
@@ -58,6 +54,10 @@ func contentWidth(width int) int {
 		usable = 20
 	}
 	return usable
+}
+
+func isPlainMode() bool {
+	return currentRenderMode == RenderModePlain
 }
 
 func headerStyle(width int) lipgloss.Style {
@@ -92,7 +92,7 @@ func cardStyle(width int) lipgloss.Style {
 		return lipgloss.NewStyle()
 	}
 	return lipgloss.NewStyle().
-		Width(contentWidth(width)).
+		Width(ContentWidth(width)).
 		Padding(1, 2).
 		Margin(1, 1).
 		Background(paletteBg).
@@ -212,14 +212,6 @@ func sectionTitle(title string) string {
 		return title
 	}
 	return lipgloss.NewStyle().Bold(true).Foreground(paletteAccent).Render(title)
-}
-
-func setSpinner(sp *spinner.Model) {
-	sp.Spinner = spinner.Line
-	if isPlainMode() {
-		return
-	}
-	sp.Style = lipgloss.NewStyle().Foreground(paletteAccent)
 }
 
 func progressChips(current int, total int) string {
