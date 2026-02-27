@@ -1,4 +1,4 @@
-package tui
+package wizard
 
 import (
 	"fmt"
@@ -164,6 +164,7 @@ func lineCount(content string) int {
 	}
 	return strings.Count(content, "\n") + 1
 }
+
 func baseName(path string) string {
 	if path == "" {
 		return ""

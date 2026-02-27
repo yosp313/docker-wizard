@@ -1,4 +1,4 @@
-package tui
+package wizard
 
 import "docker-wizard/internal/generator"
 
