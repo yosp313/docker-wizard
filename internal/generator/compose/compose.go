@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"docker-wizard/internal/generator/catalog"
+
+	"gopkg.in/yaml.v3"
 )
 
 type ComposeSelection struct {
@@ -210,4 +212,94 @@ func uniqueStrings(values []string) []string {
 		result = append(result, value)
 	}
 	return result
+}
+
+// ComposeFragment generates compose YAML containing only the requested services
+// (no app service). It returns the YAML string and the list of service IDs that
+// were auto-expanded via dependency resolution.
+func ComposeFragment(root string, serviceIDs []string) (string, []string, error) {
+	if len(serviceIDs) == 0 {
+		return "", nil, fmt.Errorf("no services specified")
+	}
+
+	serviceMap, ordered, err := catalog.CatalogMap(root)
+	if err != nil {
+		return "", nil, err
+	}
+
+	selected := make(map[string]bool, len(serviceIDs))
+	for _, id := range serviceIDs {
+		if _, ok := serviceMap[id]; !ok {
+			return "", nil, fmt.Errorf("unknown service: %s", id)
+		}
+		selected[id] = true
+	}
+
+	// snapshot before expansion to detect auto-added deps
+	before := make(map[string]bool, len(selected))
+	for id := range selected {
+		before[id] = true
+	}
+
+	if err := ExpandRequiredServices(selected, serviceMap); err != nil {
+		return "", nil, err
+	}
+
+	var expanded []string
+	for id := range selected {
+		if !before[id] {
+			expanded = append(expanded, id)
+		}
+	}
+	sort.Strings(expanded)
+
+	var services []catalog.ServiceSpec
+	var volumes []string
+
+	for _, spec := range ordered {
+		if !selected[spec.ID] {
+			continue
+		}
+		services = append(services, filterDepends(spec, selected))
+		volumes = append(volumes, spec.NamedVolumes...)
+	}
+
+	volumes = uniqueStrings(volumes)
+
+	builder := &strings.Builder{}
+	builder.WriteString("version: \"3.9\"\n")
+	builder.WriteString("services:\n")
+
+	for _, svc := range services {
+		writeService(builder, svc)
+	}
+
+	if len(volumes) > 0 {
+		sort.Strings(volumes)
+		builder.WriteString("volumes:\n")
+		for _, name := range volumes {
+			builder.WriteString("  " + name + ":\n")
+		}
+	}
+
+	builder.WriteString("networks:\n")
+	builder.WriteString("  app-net:\n")
+
+	return builder.String(), expanded, nil
+}
+
+// ExistingComposeServices parses compose YAML and returns the set of service
+// names defined under the top-level "services" key.
+func ExistingComposeServices(content string) (map[string]bool, error) {
+	var doc struct {
+		Services map[string]any `yaml:"services"`
+	}
+	if err := yaml.Unmarshal([]byte(content), &doc); err != nil {
+		return nil, fmt.Errorf("parse compose file: %w", err)
+	}
+	names := make(map[string]bool, len(doc.Services))
+	for name := range doc.Services {
+		names[name] = true
+	}
+	return names, nil
 }

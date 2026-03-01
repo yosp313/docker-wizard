@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -10,17 +9,21 @@ import (
 )
 
 const (
-	paletteBg     = lipgloss.Color("#1a1b26")
-	palettePanel  = lipgloss.Color("#1f2335")
-	paletteBorder = lipgloss.Color("#3b4261")
-	paletteText   = lipgloss.Color("#c0caf5")
-	paletteMuted  = lipgloss.Color("#565f89")
-	paletteAccent = lipgloss.Color("#7aa2f7")
-	paletteCyan   = lipgloss.Color("#7dcfff")
-	paletteGreen  = lipgloss.Color("#9ece6a")
-	paletteYellow = lipgloss.Color("#e0af68")
-	paletteRed    = lipgloss.Color("#f7768e")
-	maxContentW   = 120
+	paletteBg         = lipgloss.Color("#1a1b26")
+	palettePanel      = lipgloss.Color("#1f2335")
+	paletteBorder     = lipgloss.Color("#3b4261")
+	paletteText       = lipgloss.Color("#c0caf5")
+	paletteMuted      = lipgloss.Color("#565f89")
+	paletteAccent     = lipgloss.Color("#7aa2f7")
+	paletteCyan       = lipgloss.Color("#7dcfff")
+	paletteGreen      = lipgloss.Color("#9ece6a")
+	paletteYellow     = lipgloss.Color("#e0af68")
+	paletteRed        = lipgloss.Color("#f7768e")
+	maxContentW       = 120
+	minSideLayout     = 100
+	sidePanelW        = 34
+	wideSidePanelW    = 38
+	wideSideThreshold = 140
 )
 
 var currentRenderMode = RenderModeStyled
@@ -58,6 +61,48 @@ func ContentWidth(width int) int {
 
 func isPlainMode() bool {
 	return currentRenderMode == RenderModePlain
+}
+
+func shouldShowSidePanel(width int) bool {
+	return !isPlainMode() && width >= minSideLayout
+}
+
+func sidePanelWidth(width int) int {
+	if isPlainMode() {
+		return 0
+	}
+	if width >= wideSideThreshold {
+		return wideSidePanelW
+	}
+	return sidePanelW
+}
+
+func mainPanelWidth(width int) int {
+	if !shouldShowSidePanel(width) {
+		return width
+	}
+	return width - sidePanelWidth(width) - 1
+}
+
+// MainContentWidth returns the effective content width accounting for the
+// side panel. Use this instead of raw terminal width when computing content
+// dimensions that must fit in the main panel.
+func MainContentWidth(width int) int {
+	return mainPanelWidth(width)
+}
+
+func sidePanelStyle(width int, height int) lipgloss.Style {
+	if isPlainMode() {
+		return lipgloss.NewStyle()
+	}
+	return lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Padding(1, 1).
+		Background(paletteBg).
+		Foreground(paletteText).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(paletteBorder)
 }
 
 func headerStyle(width int) lipgloss.Style {
@@ -110,12 +155,6 @@ func errorStyle(width int) lipgloss.Style {
 		Foreground(paletteRed)
 }
 
-func badgeStyle() lipgloss.Style {
-	if isPlainMode() {
-		return lipgloss.NewStyle()
-	}
-	return lipgloss.NewStyle().Foreground(paletteCyan).Bold(true)
-}
 
 func mutedStyle() lipgloss.Style {
 	if isPlainMode() {
@@ -151,26 +190,6 @@ func keycapStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(paletteCyan)
 }
 
-func doneChipStyle() lipgloss.Style {
-	if isPlainMode() {
-		return lipgloss.NewStyle()
-	}
-	return lipgloss.NewStyle().Foreground(paletteGreen)
-}
-
-func currentChipStyle() lipgloss.Style {
-	if isPlainMode() {
-		return lipgloss.NewStyle()
-	}
-	return lipgloss.NewStyle().Foreground(paletteAccent).Bold(true)
-}
-
-func pendingChipStyle() lipgloss.Style {
-	if isPlainMode() {
-		return lipgloss.NewStyle()
-	}
-	return lipgloss.NewStyle().Foreground(paletteMuted)
-}
 
 func activePreviewTabStyle() lipgloss.Style {
 	if isPlainMode() {
@@ -214,7 +233,7 @@ func sectionTitle(title string) string {
 	return lipgloss.NewStyle().Bold(true).Foreground(paletteAccent).Render(title)
 }
 
-func progressChips(current int, total int) string {
+func progressBar(current int, total int) string {
 	if total <= 0 {
 		return ""
 	}
@@ -224,19 +243,18 @@ func progressChips(current int, total int) string {
 	if current > total {
 		current = total
 	}
-	done := current - 1
-	left := total - current
-	if isPlainMode() {
-		return fmt.Sprintf("done %d | now %d/%d | left %d", done, current, total, left)
+	const barWidth = 20
+	filled := barWidth * current / total
+	if filled < 1 {
+		filled = 1
 	}
-	return lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		doneChipStyle().Render("done "+strconv.Itoa(done)),
-		" | ",
-		currentChipStyle().Render("now "+strconv.Itoa(current)+"/"+strconv.Itoa(total)),
-		" | ",
-		pendingChipStyle().Render("left "+strconv.Itoa(left)),
-	)
+	if isPlainMode() {
+		return fmt.Sprintf("[%s%s] %d/%d", strings.Repeat("#", filled), strings.Repeat(".", barWidth-filled), current, total)
+	}
+	filledStr := lipgloss.NewStyle().Foreground(paletteAccent).Render(strings.Repeat("█", filled))
+	emptyStr := lipgloss.NewStyle().Foreground(paletteBorder).Render(strings.Repeat("░", barWidth-filled))
+	label := lipgloss.NewStyle().Foreground(paletteMuted).Render(fmt.Sprintf(" %d/%d", current, total))
+	return filledStr + emptyStr + label
 }
 
 func titleColor(frame int) lipgloss.Color {

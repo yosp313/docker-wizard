@@ -83,4 +83,7 @@ type State struct {
 	ResultNextSteps []string
 
 	ErrorMessage string
+
+	SideTitle string
+	SideLines []string
 }

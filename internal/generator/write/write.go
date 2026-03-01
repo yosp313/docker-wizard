@@ -75,3 +75,13 @@ func WriteFiles(root string, compose string, dockerfile string) (Output, error) 
 }
 
 type mergeFunc func(existing string, generated string) (string, error)
+
+// WriteComposeFile writes only the compose file, leaving Dockerfile and
+// .dockerignore untouched. Used by the add subcommand.
+func WriteComposeFile(root string, compose string) (WriteStatus, string, error) {
+	if root == "" {
+		return "", "", fmt.Errorf("root directory is required")
+	}
+	composePath := filepath.Join(root, ComposeFileName)
+	return writeManagedFile(root, composePath, "docker-compose-*.tmp", compose, MergeCompose)
+}

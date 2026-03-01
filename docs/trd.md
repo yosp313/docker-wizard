@@ -56,6 +56,10 @@ Reference diagram: `docs/flow.md`
 
 Key behavior:
 - Shared state machine supports both `styled` and `plain` render modes.
+- Header displays app title, subtitle, project name, and a progress bar (no step/language badges).
+- Side panel (styled mode, width >= 100) shows step number, stage name, language, service count, warnings, blockers, and contextual tips.
+- Header and side panel have no overlapping information; the header shows branding and progress, the side panel shows session status.
+- Plain mode header includes step/language info inline since the side panel is not rendered.
 - Language detection occurs early and can be overridden by user choice.
 - Service selection is category-based and progresses in fixed order.
 - Review can transition to preview, then generate.

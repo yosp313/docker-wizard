@@ -92,3 +92,13 @@ func buildFilePreview(path string, content string, merge mergeFunc) (FilePreview
 
 	return FilePreview{Path: path, Status: status, Content: targetContent}, nil
 }
+
+// PreviewComposeFile previews only the compose file merge result, without
+// touching Dockerfile or .dockerignore. Used by the add subcommand.
+func PreviewComposeFile(root string, compose string) (FilePreview, error) {
+	if root == "" {
+		return FilePreview{}, fmt.Errorf("root directory is required")
+	}
+	composePath := filepath.Join(root, write.ComposeFileName)
+	return buildFilePreview(composePath, compose, write.MergeCompose)
+}

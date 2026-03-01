@@ -81,3 +81,21 @@ func RunWithOptions(options Options) error {
 		return fmt.Errorf("unsupported mode: %s", mode)
 	}
 }
+
+type AddOptions = cliwizard.AddOptions
+
+func RunAdd(options AddOptions) error {
+	root, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	return cliwizard.RunAdd(root, options)
+}
+
+func RunList() error {
+	root, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	return cliwizard.RunList(root)
+}

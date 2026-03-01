@@ -80,3 +80,23 @@ func SelectionWarnings(root string, selection ComposeSelection) ([]string, error
 func WriteFiles(root string, compose string, dockerfile string) (Output, error) {
 	return write.WriteFiles(root, compose, dockerfile)
 }
+
+func ComposeFragment(root string, serviceIDs []string) (string, []string, error) {
+	return compose.ComposeFragment(root, serviceIDs)
+}
+
+func ExistingComposeServices(content string) (map[string]bool, error) {
+	return compose.ExistingComposeServices(content)
+}
+
+func ExpandRequiredServices(selected map[string]bool, services map[string]ServiceSpec) error {
+	return compose.ExpandRequiredServices(selected, services)
+}
+
+func PreviewComposeFile(root string, composeContent string) (FilePreview, error) {
+	return preview.PreviewComposeFile(root, composeContent)
+}
+
+func WriteComposeFile(root string, composeContent string) (WriteStatus, string, error) {
+	return write.WriteComposeFile(root, composeContent)
+}

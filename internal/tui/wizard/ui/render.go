@@ -8,35 +8,24 @@ import (
 )
 
 func Render(s State) string {
-	content := ""
-	switch s.Step {
-	case StepWelcome:
-		content = viewWelcome(s)
-	case StepDetect:
-		content = viewDetect(s)
-	case StepLanguage:
-		content = viewLanguage(s)
-	case StepDatabases, StepMessageQueue, StepCache, StepAnalytics, StepProxies:
-		content = viewServices(s)
-	case StepReview:
-		content = viewReview(s)
-	case StepPreview:
-		content = viewPreview(s)
-	case StepGenerate:
-		content = viewGenerate(s)
-	case StepResult:
-		content = viewResult(s)
-	case StepError:
-		content = viewError(s)
-	default:
-		content = ""
-	}
+	content := renderContent(s)
 
 	if isPlainMode() {
 		return strings.Join([]string{renderHeader(s), content, renderFooter(s)}, "\n")
 	}
 
-	content = lipgloss.NewStyle().Width(s.Width).Align(lipgloss.Center).Render(content)
+	if shouldShowSidePanel(s.Width) {
+		cs := s
+		cs.Width = mainPanelWidth(s.Width)
+		content = renderContent(cs)
+		mw := mainPanelWidth(s.Width)
+		content = lipgloss.NewStyle().Width(mw).Align(lipgloss.Center).Render(content)
+		sidePanel := renderSidePanel(s)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, content, " ", sidePanel)
+	} else {
+		content = lipgloss.NewStyle().Width(s.Width).Align(lipgloss.Center).Render(content)
+	}
+
 	view := lipgloss.JoinVertical(
 		lipgloss.Left,
 		renderHeader(s),
@@ -54,30 +43,72 @@ func Render(s State) string {
 	return view
 }
 
+func renderContent(s State) string {
+	switch s.Step {
+	case StepWelcome:
+		return viewWelcome(s)
+	case StepDetect:
+		return viewDetect(s)
+	case StepLanguage:
+		return viewLanguage(s)
+	case StepDatabases, StepMessageQueue, StepCache, StepAnalytics, StepProxies:
+		return viewServices(s)
+	case StepReview:
+		return viewReview(s)
+	case StepPreview:
+		return viewPreview(s)
+	case StepGenerate:
+		return viewGenerate(s)
+	case StepResult:
+		return viewResult(s)
+	case StepError:
+		return viewError(s)
+	default:
+		return ""
+	}
+}
+
+func renderSidePanel(s State) string {
+	headerH := lipgloss.Height(renderHeader(s))
+	footerH := lipgloss.Height(renderFooter(s))
+	available := s.Height - headerH - footerH - 4
+	if available < 4 {
+		available = 4
+	}
+
+	lines := []string{sectionTitle(s.SideTitle), ""}
+	for _, line := range s.SideLines {
+		if line == "" {
+			lines = append(lines, "")
+		} else {
+			lines = append(lines, mutedStyle().Render(line))
+		}
+	}
+	body := strings.Join(lines, "\n")
+	spw := sidePanelWidth(s.Width) - 4
+	if spw < 10 {
+		spw = 10
+	}
+	return sidePanelStyle(spw, available).Render(body)
+}
+
 func renderHeader(s State) string {
 	padding := strings.Repeat(" ", s.HeaderIndent)
-	stepText := fmt.Sprintf("Step %d/%d", s.StepIndex, s.TotalSteps)
 	if isPlainMode() {
-		return plainHeader(s.StepIndex, s.TotalSteps, string(s.Step), s.LanguageText, s.ProjectName, progressChips(s.StepIndex, s.TotalSteps), s.HeaderIndent)
+		return plainHeader(s.StepIndex, s.TotalSteps, string(s.Step), s.LanguageText, s.ProjectName, progressBar(s.StepIndex, s.TotalSteps), s.HeaderIndent)
 	}
 
 	title := lipgloss.NewStyle().Bold(true).Foreground(titleColor(s.Frame)).Render("Docker Wizard")
 	subtitle := mutedStyle().Render("Generate Dockerfile and docker-compose from guided selections")
 	project := mutedStyle().Render("project: " + s.ProjectName)
 
-	stepBadge := badgeStyle().Render(stepText)
-	stepNameBadge := badgeStyle().Render(string(s.Step))
-	langBadge := badgeStyle().Render(s.LanguageText)
-	status := lipgloss.JoinHorizontal(lipgloss.Left, stepBadge, "  ", stepNameBadge, "  ", langBadge)
-	status = lipgloss.NewStyle().Width(ContentWidth(s.Width)).Align(lipgloss.Center).Render(status)
-
-	chips := progressChips(s.StepIndex, s.TotalSteps)
-	chips = lipgloss.NewStyle().Width(ContentWidth(s.Width)).Align(lipgloss.Center).Render(chips)
+	bar := progressBar(s.StepIndex, s.TotalSteps)
+	bar = lipgloss.NewStyle().Width(ContentWidth(s.Width)).Align(lipgloss.Center).Render(bar)
 
 	heading := lipgloss.JoinVertical(lipgloss.Center, title, subtitle, project)
 	heading = lipgloss.NewStyle().Width(ContentWidth(s.Width)).Align(lipgloss.Center).Render(heading)
 
-	content := lipgloss.JoinVertical(lipgloss.Center, heading, "", status, chips)
+	content := lipgloss.JoinVertical(lipgloss.Center, heading, "", bar)
 	content = lipgloss.NewStyle().Width(s.Width).Align(lipgloss.Center).Render(content)
 	return headerStyle(s.Width).Render(padding + content)
 }

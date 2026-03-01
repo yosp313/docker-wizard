@@ -3,7 +3,7 @@
 Docker Wizard is a Go CLI/TUI tool that scaffolds a Docker development stack for your project. It detects the primary language in your working directory, generates a matching `Dockerfile`, and generates a `docker-compose.yml` based on the services you select.
 
 ## Features
-- Step-by-step wizard UI with a polished header/footer and animations
+- Step-by-step wizard UI with a progress bar header, status side panel, and animations
 - Multiple run modes for local and automation workflows (`styled`, `plain`, `cli`, `batch`)
 - Language + version detection with config-driven Dockerfile templates for Go, Node, Python, Ruby, PHP, Java, and .NET
 - Category-based service selection (databases, queues, cache, analytics, proxies)
@@ -34,6 +34,11 @@ docker-wizard --mode plain
 docker-wizard --mode cli
 docker-wizard --mode batch --services mysql,redis --language go --dry-run
 docker-wizard --mode batch --services all --write
+
+# subcommands
+docker-wizard add mysql redis kafka
+docker-wizard add mysql --write
+docker-wizard list
 ```
 
 Run modes:
@@ -48,6 +53,30 @@ Batch mode flags:
 - `--dry-run`: preview file status and warnings without writing (default behavior)
 - `--write`: write generated files
 
+### Subcommands
+
+#### `docker-wizard add <service...>`
+Incrementally add services to an existing `docker-compose.yml` without re-running the full wizard.
+
+- Accepts one or more service IDs as positional arguments
+- Dry-run by default — pass `--write` to apply changes
+- Skips services already present in the compose file
+- Auto-expands dependencies (e.g. `kafka` pulls in `zookeeper`)
+- Generates compose-only output (no Dockerfile changes)
+- Merges into existing compose using user-priority merge
+- Creates a minimal compose if none exists
+
+```bash
+docker-wizard add mysql redis        # preview changes
+docker-wizard add mysql redis --write # apply changes
+```
+
+#### `docker-wizard list`
+Show available service IDs from the catalog, grouped by category.
+
+```bash
+docker-wizard list
+```
 ## Usage flow
 1. Start the wizard.
 2. The tool detects your project language (you can override it).

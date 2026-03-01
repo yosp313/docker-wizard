@@ -104,6 +104,12 @@
 - Review and generate
 - Result
 
+### Styled TUI layout
+- Header: app title, subtitle, project name, and a progress bar showing current step out of total steps
+- Side panel (visible when terminal width >= 100 columns): step number, stage name, language, service count, warnings, blockers, and a contextual tip
+- Footer: context-sensitive key binding hints
+- The header and side panel have no overlapping information; the header shows branding and progress, while the side panel shows session status
+
 ### Run modes
 - Styled mode (`--mode styled`, default): full TUI styling
 - Plain mode (`--mode plain`): same TUI flow with plain text rendering for terminal compatibility
@@ -121,3 +127,20 @@
 - Testing: unit tests, fixture projects, and snapshot tests
 - Non-goals: no deployment or cloud orchestration
 - Distribution: releases, install method, and supported OS/terminal constraints
+
+## Subcommands
+
+### `docker-wizard add <service...>` — incremental service addition
+- Adds services to an existing `docker-compose.yml` without re-running the full wizard
+- Accepts one or more service IDs as positional arguments
+- Dry-run by default; pass `--write` to apply changes
+- Skips services already present in the compose file (with notice)
+- Auto-expands dependencies (e.g. kafka pulls in zookeeper) with notice
+- Generates compose-only fragments (no app service, no Dockerfile changes)
+- Merges into existing compose using the same user-priority merge infrastructure
+- Creates a minimal compose file if none exists (no app service)
+- Networks always use `app-net`
+
+### `docker-wizard list` — show available services
+- Lists all selectable services from the catalog grouped by category
+- Uses category order and labels from `internal/utils/services.go`

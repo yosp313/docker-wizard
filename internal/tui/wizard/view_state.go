@@ -132,7 +132,59 @@ func (m model) buildViewState() ui.State {
 		s.ErrorMessage = m.err.Error()
 	}
 
+	s.SideTitle = "Status"
+	s.SideLines = m.sideViewLines()
+
 	return s
+}
+
+func (m model) sideViewLines() []string {
+	lines := []string{
+		fmt.Sprintf("Step %d/%d", m.stepIndex(), totalSteps),
+		fmt.Sprintf("Stage: %s", stepTitle(m.step)),
+		"",
+	}
+	if m.langDetected {
+		lines = append(lines, "Language: "+languageLabelWithVersion(m.effectiveDetails()))
+	} else {
+		lines = append(lines, "Language: detecting...")
+	}
+	lines = append(lines, "")
+	count := len(selectedServiceIDs(m.services, m.selected))
+	lines = append(lines, fmt.Sprintf("Services: %d selected", count))
+	if len(m.warnings) > 0 {
+		lines = append(lines, fmt.Sprintf("Warnings: %d", len(m.warnings)))
+	}
+	if len(m.blockers) > 0 {
+		lines = append(lines, fmt.Sprintf("Blockers: %d", len(m.blockers)))
+	}
+	lines = append(lines, "", tipForStep(m.step))
+	return lines
+}
+
+func tipForStep(s step) string {
+	switch s {
+	case stepWelcome:
+		return "Press enter to begin"
+	case stepDetect:
+		return "Detecting your project..."
+	case stepLanguage:
+		return "Pick your language"
+	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
+		return "Space to toggle, enter to continue"
+	case stepReview:
+		return "Review before generating"
+	case stepPreview:
+		return "Scroll to inspect files"
+	case stepGenerate:
+		return "Generating files..."
+	case stepResult:
+		return "All done!"
+	case stepError:
+		return "Something went wrong"
+	default:
+		return ""
+	}
 }
 
 func (m model) footerKeys() string {

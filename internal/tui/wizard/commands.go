@@ -134,7 +134,7 @@ func (m *model) previewContentHeight() int {
 }
 
 func (m *model) previewContentWidth() int {
-	available := ui.ContentWidth(m.width) - 6
+	available := ui.ContentWidth(ui.MainContentWidth(m.width)) - 6
 	if available < 20 {
 		return 20
 	}
