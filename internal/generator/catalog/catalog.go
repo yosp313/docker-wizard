@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strings"
 
 	"docker-wizard/internal/utils"
 )
@@ -150,4 +152,106 @@ func sortServices(services []ServiceSpec) {
 		}
 		return services[i].Order < services[j].Order
 	})
+}
+
+var nonAlphanumHyphen = regexp.MustCompile(`[^a-z0-9-]`)
+
+func slugify(name string) string {
+	s := strings.ToLower(name)
+	s = strings.ReplaceAll(s, " ", "-")
+	s = nonAlphanumHyphen.ReplaceAllString(s, "")
+	return s
+}
+
+// AppendService appends a new ServiceSpec to <root>/config/services.json.
+// It auto-generates a unique ID from svc.Name (or svc.Label as fallback),
+// applies sensible defaults, validates the category, and writes the file.
+func AppendService(root string, svc ServiceSpec) error {
+	if svc.Category == "" || !validCategory(svc.Category) {
+		return fmt.Errorf("invalid category: %q", svc.Category)
+	}
+
+	// Load existing catalog (treat missing file as empty).
+	primaryPath := filepath.Join(root, "config", "services.json")
+	var existing ServiceCatalog
+	data, err := os.ReadFile(primaryPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read existing catalog: %w", err)
+	}
+	if err == nil {
+		if jsonErr := json.Unmarshal(data, &existing); jsonErr != nil {
+			return fmt.Errorf("parse existing catalog: %w", jsonErr)
+		}
+	}
+
+	// Build set of existing IDs for uniqueness check.
+	existingIDs := make(map[string]bool, len(existing.Services))
+	for _, s := range existing.Services {
+		existingIDs[s.ID] = true
+	}
+
+	// Determine the base name for slug generation.
+	baseName := svc.Name
+	if baseName == "" {
+		baseName = svc.Label
+	}
+
+	// Generate unique ID.
+	baseSlug := slugify(baseName)
+	if baseSlug == "" {
+		baseSlug = "service"
+	}
+
+	candidate := baseSlug
+	if existingIDs[candidate] {
+		found := false
+		for i := 2; i <= 99; i++ {
+			candidate = fmt.Sprintf("%s-%d", baseSlug, i)
+			if !existingIDs[candidate] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("cannot generate unique id for %q: all candidates up to -99 are taken", baseName)
+		}
+	}
+	svc.ID = candidate
+
+	// Apply defaults.
+	if !svc.Selectable {
+		svc.Selectable = true
+	}
+	// Public defaults to false — zero value is already false, nothing to do.
+	if svc.Order == 0 {
+		svc.Order = 100
+	}
+	if svc.Name == "" {
+		if svc.Label != "" {
+			svc.Name = svc.Label
+		} else {
+			svc.Name = svc.ID
+		}
+	}
+	if svc.Label == "" {
+		svc.Label = svc.Name
+	}
+
+	// Append and marshal.
+	existing.Services = append(existing.Services, svc)
+	out, err := json.MarshalIndent(existing, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal catalog: %w", err)
+	}
+
+	// Ensure directory exists.
+	if mkErr := os.MkdirAll(filepath.Join(root, "config"), 0o755); mkErr != nil {
+		return fmt.Errorf("create config directory: %w", mkErr)
+	}
+
+	if writeErr := os.WriteFile(primaryPath, out, 0o644); writeErr != nil {
+		return fmt.Errorf("write catalog: %w", writeErr)
+	}
+
+	return nil
 }
