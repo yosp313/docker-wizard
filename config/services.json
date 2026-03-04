@@ -10,7 +10,7 @@
       "ports": [
         "3306:3306"
       ],
-      "public": false,
+      "expose": null,
       "env": [
         "MYSQL_ROOT_PASSWORD=example"
       ],
@@ -20,8 +20,12 @@
       "namedVolumes": [
         "mysql-data"
       ],
+      "dependsOn": null,
+      "command": null,
+      "public": false,
       "selectable": true,
-      "order": 10
+      "order": 10,
+      "requires": null
     },
     {
       "id": "postgres",
@@ -33,7 +37,7 @@
       "ports": [
         "5432:5432"
       ],
-      "public": false,
+      "expose": null,
       "env": [
         "POSTGRES_PASSWORD=example"
       ],
@@ -43,8 +47,12 @@
       "namedVolumes": [
         "postgres-data"
       ],
+      "dependsOn": null,
+      "command": null,
+      "public": false,
       "selectable": true,
-      "order": 20
+      "order": 20,
+      "requires": null
     },
     {
       "id": "mongodb",
@@ -56,15 +64,20 @@
       "ports": [
         "27017:27017"
       ],
-      "public": false,
+      "expose": null,
+      "env": null,
       "volumeMounts": [
         "mongo-data:/data/db"
       ],
       "namedVolumes": [
         "mongo-data"
       ],
+      "dependsOn": null,
+      "command": null,
+      "public": false,
       "selectable": true,
-      "order": 25
+      "order": 25,
+      "requires": null
     },
     {
       "id": "redis",
@@ -76,9 +89,16 @@
       "ports": [
         "6379:6379"
       ],
+      "expose": null,
+      "env": null,
+      "volumeMounts": null,
+      "namedVolumes": null,
+      "dependsOn": null,
+      "command": null,
       "public": false,
       "selectable": true,
-      "order": 30
+      "order": 30,
+      "requires": null
     },
     {
       "id": "memcached",
@@ -90,9 +110,16 @@
       "ports": [
         "11211:11211"
       ],
+      "expose": null,
+      "env": null,
+      "volumeMounts": null,
+      "namedVolumes": null,
+      "dependsOn": null,
+      "command": null,
       "public": false,
       "selectable": true,
-      "order": 35
+      "order": 35,
+      "requires": null
     },
     {
       "id": "metabase",
@@ -104,9 +131,16 @@
       "ports": [
         "3000:3000"
       ],
+      "expose": null,
+      "env": null,
+      "volumeMounts": null,
+      "namedVolumes": null,
+      "dependsOn": null,
+      "command": null,
       "public": true,
       "selectable": true,
-      "order": 40
+      "order": 40,
+      "requires": null
     },
     {
       "id": "plausible",
@@ -118,7 +152,7 @@
       "ports": [
         "8000:8000"
       ],
-      "public": true,
+      "expose": null,
       "env": [
         "BASE_URL=http://localhost:8000",
         "SECRET_KEY_BASE=change-me",
@@ -126,16 +160,20 @@
         "CLICKHOUSE_URL=http://plausible-db:8123",
         "DATABASE_URL=postgres://postgres:example@plausible-postgres:5432/plausible"
       ],
+      "volumeMounts": null,
+      "namedVolumes": null,
       "dependsOn": [
         "plausible-postgres",
         "plausible-db"
       ],
+      "command": null,
+      "public": true,
+      "selectable": true,
+      "order": 45,
       "requires": [
         "plausible-postgres",
         "plausible-db"
-      ],
-      "selectable": true,
-      "order": 45
+      ]
     },
     {
       "id": "plausible-postgres",
@@ -147,7 +185,7 @@
       "ports": [
         "5433:5432"
       ],
-      "public": false,
+      "expose": null,
       "env": [
         "POSTGRES_PASSWORD=example",
         "POSTGRES_DB=plausible"
@@ -158,8 +196,12 @@
       "namedVolumes": [
         "plausible-postgres"
       ],
+      "dependsOn": null,
+      "command": null,
+      "public": false,
       "selectable": false,
-      "order": 46
+      "order": 46,
+      "requires": null
     },
     {
       "id": "plausible-db",
@@ -171,7 +213,7 @@
       "ports": [
         "8123:8123"
       ],
-      "public": false,
+      "expose": null,
       "env": [
         "CLICKHOUSE_DB=plausible"
       ],
@@ -181,8 +223,12 @@
       "namedVolumes": [
         "plausible-clickhouse"
       ],
+      "dependsOn": null,
+      "command": null,
+      "public": false,
       "selectable": false,
-      "order": 47
+      "order": 47,
+      "requires": null
     },
     {
       "id": "nginx",
@@ -194,9 +240,16 @@
       "ports": [
         "80:80"
       ],
+      "expose": null,
+      "env": null,
+      "volumeMounts": null,
+      "namedVolumes": null,
+      "dependsOn": null,
+      "command": null,
       "public": true,
       "selectable": true,
-      "order": 50
+      "order": 50,
+      "requires": null
     },
     {
       "id": "traefik",
@@ -209,13 +262,19 @@
         "80:80",
         "8080:8080"
       ],
-      "public": true,
+      "expose": null,
+      "env": null,
+      "volumeMounts": null,
+      "namedVolumes": null,
+      "dependsOn": null,
       "command": [
         "--api.insecure=true",
         "--providers.docker=true"
       ],
+      "public": true,
       "selectable": true,
-      "order": 60
+      "order": 60,
+      "requires": null
     },
     {
       "id": "caddy",
@@ -228,15 +287,20 @@
         "80:80",
         "443:443"
       ],
-      "public": true,
+      "expose": null,
+      "env": null,
       "volumeMounts": [
         "caddy-data:/data"
       ],
       "namedVolumes": [
         "caddy-data"
       ],
+      "dependsOn": null,
+      "command": null,
+      "public": true,
       "selectable": true,
-      "order": 70
+      "order": 70,
+      "requires": null
     },
     {
       "id": "rabbitmq",
@@ -249,9 +313,16 @@
         "5672:5672",
         "15672:15672"
       ],
+      "expose": null,
+      "env": null,
+      "volumeMounts": null,
+      "namedVolumes": null,
+      "dependsOn": null,
+      "command": null,
       "public": false,
       "selectable": true,
-      "order": 80
+      "order": 80,
+      "requires": null
     },
     {
       "id": "zookeeper",
@@ -263,12 +334,18 @@
       "ports": [
         "2181:2181"
       ],
-      "public": false,
+      "expose": null,
       "env": [
         "ALLOW_ANONYMOUS_LOGIN=yes"
       ],
+      "volumeMounts": null,
+      "namedVolumes": null,
+      "dependsOn": null,
+      "command": null,
+      "public": false,
       "selectable": false,
-      "order": 90
+      "order": 90,
+      "requires": null
     },
     {
       "id": "kafka",
@@ -280,7 +357,7 @@
       "ports": [
         "9092:9092"
       ],
-      "public": false,
+      "expose": null,
       "env": [
         "KAFKA_BROKER_ID=1",
         "KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181",
@@ -288,14 +365,43 @@
         "KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092",
         "ALLOW_PLAINTEXT_LISTENER=yes"
       ],
+      "volumeMounts": null,
+      "namedVolumes": null,
       "dependsOn": [
         "zookeeper"
       ],
+      "command": null,
+      "public": false,
+      "selectable": true,
+      "order": 100,
       "requires": [
         "zookeeper"
+      ]
+    },
+    {
+      "id": "elastic-search",
+      "name": "elasticsearch",
+      "label": "Elastic Search",
+      "description": "",
+      "category": "analytics",
+      "image": "elasticsearch:7.17.9",
+      "ports": [
+        "4090:4090"
       ],
+      "expose": null,
+      "env": [
+        "discovery.type=single-node"
+      ],
+      "volumeMounts": [
+        "/data/sist2-admin-data/:/sist2-admin/"
+      ],
+      "namedVolumes": null,
+      "dependsOn": null,
+      "command": null,
+      "public": false,
       "selectable": true,
-      "order": 100
+      "order": 100,
+      "requires": null
     }
   ]
 }

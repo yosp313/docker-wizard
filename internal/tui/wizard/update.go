@@ -62,6 +62,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.animateHeader()
 		return m, nil
 	case tea.KeyMsg:
+		if m.step == stepAddService {
+			return m, m.handleAddServiceMsg(msg)
+		}
 		return m, m.handleKey(msg)
 	}
 

@@ -53,6 +53,8 @@ func renderContent(s State) string {
 		return viewLanguage(s)
 	case StepDatabases, StepMessageQueue, StepCache, StepAnalytics, StepProxies:
 		return viewServices(s)
+	case StepAddService:
+		return viewAddService(s)
 	case StepReview:
 		return viewReview(s)
 	case StepPreview:
@@ -280,6 +282,10 @@ func viewError(s State) string {
 	return renderErrorCard(s.Width, "Error", strings.Join(body, "\n"))
 }
 
+func viewAddService(s State) string {
+	return renderCard(s.Width, "Add Custom Service", s.AddServiceBody)
+}
+
 func renderCard(width int, title string, body string) string {
 	return cardStyle(width).Render(sectionTitle(title) + "\n\n" + body)
 }
@@ -338,7 +344,7 @@ func formatFooterHints(raw string) string {
 
 func isKeyToken(token string) bool {
 	switch token {
-	case "enter", "q", "b", "l", "p", "r", "space", "up/down", "left/right", "1/2/3", "home", "end":
+	case "enter", "q", "b", "l", "n", "p", "r", "space", "up/down", "left/right", "1/2/3", "home", "end", "tab", "shift+tab", "esc":
 		return true
 	default:
 		return false

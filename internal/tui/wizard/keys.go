@@ -2,6 +2,7 @@ package wizard
 
 import (
 	"docker-wizard/internal/generator"
+	"docker-wizard/internal/utils"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -31,6 +32,8 @@ func (m *model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		return m.handleResultKey(key)
 	case stepError:
 		return m.handleErrorKey(key)
+	case stepAddService:
+		// handled via handleAddServiceMsg in update.go; should not reach here
 	}
 
 	return nil
@@ -106,6 +109,11 @@ func (m *model) handleServiceStepKey(key string) tea.Cmd {
 		if len(services) > 0 {
 			m.toggleCurrentSelection()
 		}
+	case "n":
+		m.previousStep = m.step
+		m.resetAddServiceForm()
+		m.step = stepAddService
+		m.animateHeader()
 	case "enter":
 		if m.step == stepProxy {
 			if err := m.prepareReview(); err != nil {
@@ -174,5 +182,56 @@ func (m *model) handleErrorKey(key string) tea.Cmd {
 		m.animateHeader()
 		return nil
 	}
+	return nil
+}
+
+// handleAddServiceMsg handles all messages for stepAddService, routing
+// non-navigation keypresses to the active textinput.
+func (m *model) handleAddServiceMsg(msg tea.KeyMsg) tea.Cmd {
+	key := msg.String()
+
+	if key == "ctrl+c" || key == "q" {
+		return tea.Quit
+	}
+
+	switch key {
+	case "esc":
+		m.step = m.previousStep
+		m.animateHeader()
+		return nil
+	case "tab":
+		m.addServiceFocusedField = (m.addServiceFocusedField + 1) % addServiceFieldCount
+		m.syncAddServiceFocus()
+		return nil
+	case "shift+tab":
+		m.addServiceFocusedField = (m.addServiceFocusedField + addServiceFieldCount - 1) % addServiceFieldCount
+		m.syncAddServiceFocus()
+		return nil
+	case "up":
+		if m.addServiceFocusedField == 2 {
+			categories := utils.CategoryOrder()
+			m.addServiceCategoryIdx = (m.addServiceCategoryIdx - 1 + len(categories)) % len(categories)
+		}
+		return nil
+	case "down":
+		if m.addServiceFocusedField == 2 {
+			categories := utils.CategoryOrder()
+			m.addServiceCategoryIdx = (m.addServiceCategoryIdx + 1) % len(categories)
+		}
+		return nil
+	case "enter":
+		return m.confirmAddService()
+	}
+
+	// Forward non-special keys to the active textinput (not category field).
+	if m.addServiceFocusedField != 2 {
+		idx := addServiceTextInputIndex(m.addServiceFocusedField)
+		if idx >= 0 {
+			var cmd tea.Cmd
+			m.addServiceInputs[idx], cmd = m.addServiceInputs[idx].Update(msg)
+			return cmd
+		}
+	}
+
 	return nil
 }

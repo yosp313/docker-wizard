@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"docker-wizard/internal/utils"
 )
@@ -150,4 +151,90 @@ func sortServices(services []ServiceSpec) {
 		}
 		return services[i].Order < services[j].Order
 	})
+}
+
+// AppendService loads the catalog at <root>/config/services.json (creating it if
+// absent), appends svc with an auto-generated unique ID, and writes the file back.
+func AppendService(root string, svc ServiceSpec) error {
+	if root == "" {
+		return fmt.Errorf("root directory is required")
+	}
+	if !validCategory(svc.Category) {
+		return fmt.Errorf("invalid category: %s", svc.Category)
+	}
+
+	path := filepath.Join(root, "config", "services.json")
+
+	var existing ServiceCatalog
+	data, err := os.ReadFile(path)
+	if err == nil {
+		if err := json.Unmarshal(data, &existing); err != nil {
+			return fmt.Errorf("parse service catalog: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("read service catalog: %w", err)
+	}
+
+	id, err := generateUniqueID(svc.Name, existing.Services)
+	if err != nil {
+		return err
+	}
+	svc.ID = id
+	svc.Selectable = true
+	svc.Public = false
+	if svc.Order == 0 {
+		svc.Order = 100
+	}
+
+	existing.Services = append(existing.Services, svc)
+
+	out, err := json.MarshalIndent(existing, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal service catalog: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+
+	return os.WriteFile(path, out, 0o644)
+}
+
+func slugify(name string) string {
+	s := strings.ToLower(name)
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+			b.WriteRune(r)
+		case r == ' ', r == '_':
+			b.WriteRune('-')
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func generateUniqueID(name string, services []ServiceSpec) (string, error) {
+	existing := make(map[string]bool, len(services))
+	for _, s := range services {
+		existing[s.ID] = true
+	}
+
+	base := slugify(name)
+	if base == "" {
+		base = "custom-service"
+	}
+
+	if !existing[base] {
+		return base, nil
+	}
+
+	for i := 2; i <= 99; i++ {
+		candidate := fmt.Sprintf("%s-%d", base, i)
+		if !existing[candidate] {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not generate unique ID for service %q", name)
 }

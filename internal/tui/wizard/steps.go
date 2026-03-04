@@ -74,6 +74,8 @@ func stepTitle(current step) string {
 		return "Analytics"
 	case stepProxy:
 		return "Webservers / Proxies"
+	case stepAddService:
+		return "Add Service"
 	default:
 		return "Services"
 	}
@@ -184,6 +186,8 @@ func (m model) stepIndex() int {
 		return 11
 	case stepError:
 		return 11
+	case stepAddService:
+		return 0
 	default:
 		return 1
 	}

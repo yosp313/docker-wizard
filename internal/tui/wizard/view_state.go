@@ -7,6 +7,8 @@ import (
 	"docker-wizard/internal/generator"
 	"docker-wizard/internal/tui/wizard/ui"
 	"docker-wizard/internal/utils"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m model) buildViewState() ui.State {
@@ -135,6 +137,10 @@ func (m model) buildViewState() ui.State {
 	s.SideTitle = "Status"
 	s.SideLines = m.sideViewLines()
 
+	if m.step == stepAddService {
+		s.AddServiceBody = m.buildAddServiceBody()
+	}
+
 	return s
 }
 
@@ -172,6 +178,8 @@ func tipForStep(s step) string {
 		return "Pick your language"
 	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
 		return "Space to toggle, enter to continue"
+	case stepAddService:
+		return "Fill in fields and press Enter"
 	case stepReview:
 		return "Review before generating"
 	case stepPreview:
@@ -199,7 +207,9 @@ func (m model) footerKeys() string {
 	case stepLanguage:
 		return "up/down move | enter select | b back | q quit"
 	case stepDatabase, stepMessageQueue, stepCache, stepAnalytics, stepProxy:
-		return "up/down move | space toggle | enter next | b back | q quit"
+		return "up/down move | space toggle | enter next | n add service | b back | q quit"
+	case stepAddService:
+		return "tab next field | shift+tab prev field | up/down category | enter save | esc cancel | q quit"
 	case stepReview:
 		if len(m.blockers) > 0 {
 			return "resolve blockers to continue | p preview | b back | q quit"
@@ -252,6 +262,8 @@ func mapStep(current step) ui.Step {
 		return ui.StepResult
 	case stepError:
 		return ui.StepError
+	case stepAddService:
+		return ui.StepAddService
 	default:
 		return ui.StepWelcome
 	}
@@ -283,6 +295,51 @@ func previewStatusLabel(status generator.FileStatus) string {
 	default:
 		return string(status)
 	}
+}
+
+// buildAddServiceBody renders the add-service form content as a string.
+func (m model) buildAddServiceBody() string {
+	categories := utils.CategoryOrder()
+	category := utils.CategoryLabel(categories[m.addServiceCategoryIdx])
+
+	type fieldDef struct {
+		label   string
+		value   string
+		focused bool
+	}
+	fields := []fieldDef{
+		{"Name *", m.addServiceInputs[0].View(), m.addServiceFocusedField == 0},
+		{"Docker Image *", m.addServiceInputs[1].View(), m.addServiceFocusedField == 1},
+		{"Category", category, m.addServiceFocusedField == 2},
+		{"Ports", m.addServiceInputs[2].View(), m.addServiceFocusedField == 3},
+		{"Env Vars", m.addServiceInputs[3].View(), m.addServiceFocusedField == 4},
+		{"Volume Mounts", m.addServiceInputs[4].View(), m.addServiceFocusedField == 5},
+	}
+
+	lines := make([]string, 0, len(fields)+4)
+	for i, f := range fields {
+		prefix := "  "
+		if f.focused {
+			prefix = "> "
+		}
+		var line string
+		if i == 2 {
+			// Category is a selector, not a text input
+			line = fmt.Sprintf("%s%-15s %s", prefix, f.label+":", f.value)
+		} else {
+			line = fmt.Sprintf("%s%-15s %s", prefix, f.label+":", f.value)
+		}
+		lines = append(lines, line)
+	}
+
+	lines = append(lines, "", "  * required fields")
+
+	if m.addServiceFormError != "" {
+		errLine := lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Render("  Error: " + m.addServiceFormError)
+		lines = append(lines, "", errLine)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func previewDivider(width int) string {

@@ -23,6 +23,7 @@ const (
 	StepGenerate     Step = "generate"
 	StepResult       Step = "result"
 	StepError        Step = "error"
+	StepAddService   Step = "add-service"
 )
 
 type OptionItem struct {
@@ -86,4 +87,6 @@ type State struct {
 
 	SideTitle string
 	SideLines []string
+
+	AddServiceBody string
 }

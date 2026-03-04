@@ -6,6 +6,7 @@ import (
 	"docker-wizard/internal/generator"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/harmonica"
 )
@@ -26,6 +27,7 @@ const (
 	stepGenerate
 	stepResult
 	stepError
+	stepAddService
 )
 
 const totalSteps = 11
@@ -103,4 +105,10 @@ type model struct {
 	headerVel    float64
 	headerTarget float64
 	lastStep     step
+
+	// add-service form state
+	addServiceFocusedField int
+	addServiceInputs       [5]textinput.Model // name, image, ports, env vars, volume mounts
+	addServiceCategoryIdx  int
+	addServiceFormError    string
 }
