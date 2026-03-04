@@ -62,6 +62,15 @@ func TestAppendService_HappyPath(t *testing.T) {
 	if got.Image != "redis:7" {
 		t.Errorf("image: got %q, want %q", got.Image, "redis:7")
 	}
+	if !got.Selectable {
+		t.Errorf("selectable: got false, want true")
+	}
+	if got.Public {
+		t.Errorf("public: got true, want false")
+	}
+	if got.Order != 100 {
+		t.Errorf("order: got %d, want 100", got.Order)
+	}
 }
 
 // TestAppendService_IDAutoGeneration checks that "My Redis" becomes id "my-redis".

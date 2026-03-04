@@ -219,9 +219,7 @@ func AppendService(root string, svc ServiceSpec) error {
 	svc.ID = candidate
 
 	// Apply defaults.
-	if !svc.Selectable {
-		svc.Selectable = true
-	}
+	svc.Selectable = true
 	// Public defaults to false — zero value is already false, nothing to do.
 	if svc.Order == 0 {
 		svc.Order = 100
