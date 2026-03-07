@@ -155,7 +155,6 @@ func errorStyle(width int) lipgloss.Style {
 		Foreground(paletteRed)
 }
 
-
 func mutedStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle()
@@ -189,7 +188,6 @@ func keycapStyle() lipgloss.Style {
 	}
 	return lipgloss.NewStyle().Bold(true).Foreground(paletteCyan)
 }
-
 
 func activePreviewTabStyle() lipgloss.Style {
 	if isPlainMode() {

@@ -27,14 +27,14 @@ func Run(root string) error {
 	}
 
 	m := model{
-		root:                root,
-		step:                stepWelcome,
-		spinner:             spinner.New(),
-		headerSpring:        harmonica.NewSpring(harmonica.FPS(60), 7.0, 0.6),
-		services:            serviceChoicesFromCatalog(services),
-		selected:            map[string]bool{},
-		langOptions:         defaultLanguageOptions(),
-		addServiceInputs:    initAddServiceInputs(),
+		root:             root,
+		step:             stepWelcome,
+		spinner:          spinner.New(),
+		headerSpring:     harmonica.NewSpring(harmonica.FPS(60), 7.0, 0.6),
+		services:         serviceChoicesFromCatalog(services),
+		selected:         map[string]bool{},
+		langOptions:      defaultLanguageOptions(),
+		addServiceInputs: initAddServiceInputs(),
 	}
 	ui.ConfigureSpinner(&m.spinner)
 
