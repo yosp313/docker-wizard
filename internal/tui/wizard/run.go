@@ -30,7 +30,7 @@ func Run(root string) error {
 		root:             root,
 		step:             stepWelcome,
 		spinner:          spinner.New(),
-		headerSpring:     harmonica.NewSpring(harmonica.FPS(60), 7.0, 0.6),
+		headerSpring:     harmonica.NewSpring(harmonica.FPS(60), 25.0, 0.8),
 		services:         serviceChoicesFromCatalog(services),
 		selected:         map[string]bool{},
 		langOptions:      defaultLanguageOptions(),

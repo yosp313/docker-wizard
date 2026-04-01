@@ -38,11 +38,11 @@ func SetRenderMode(mode RenderMode) {
 }
 
 func ConfigureSpinner(sp *spinner.Model) {
-	sp.Spinner = spinner.Line
+	sp.Spinner = spinner.MiniDot
 	if isPlainMode() {
 		return
 	}
-	sp.Style = lipgloss.NewStyle().Foreground(paletteAccent)
+	sp.Style = lipgloss.NewStyle().Foreground(paletteCyan)
 }
 
 func ContentWidth(width int) int {
