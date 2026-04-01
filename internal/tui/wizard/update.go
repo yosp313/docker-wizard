@@ -1,16 +1,31 @@
 package wizard
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+type windowSizeTimeoutMsg struct {
+	gen int
+}
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.syncPreviewViewportSize()
+		m.resizeGeneration++
+		currentGen := m.resizeGeneration
+
+		return m, tea.Tick(150*time.Millisecond, func(_ time.Time) tea.Msg {
+			return windowSizeTimeoutMsg{gen: currentGen}
+		})
+	case windowSizeTimeoutMsg:
+		if msg.gen == m.resizeGeneration {
+			m.syncPreviewViewportSize()
+		}
 		return m, nil
 	case tickMsg:
 		m.frame++

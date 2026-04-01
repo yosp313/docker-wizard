@@ -73,6 +73,9 @@ type model struct {
 	width  int
 	height int
 
+	resizeGeneration int
+
+
 	spinner spinner.Model
 
 	langDetected bool
