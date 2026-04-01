@@ -1,6 +1,8 @@
 package wizard
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"docker-wizard/internal/generator"
@@ -65,6 +67,30 @@ func (m *model) resetAddServiceForm() {
 	m.addServiceInputs[0].Focus()
 }
 
+func (m *model) validateAddServiceForm() bool {
+	m.addServiceFormError = ""
+
+	ports := splitCommaValues(m.addServiceInputs[2].Value())
+	if err := validatePorts(ports); err != nil {
+		m.addServiceFormError = err.Error()
+		return false
+	}
+
+	env := splitCommaValues(m.addServiceInputs[3].Value())
+	if err := validateEnvVars(env); err != nil {
+		m.addServiceFormError = err.Error()
+		return false
+	}
+
+	volumes := splitCommaValues(m.addServiceInputs[4].Value())
+	if err := validateVolumes(volumes); err != nil {
+		m.addServiceFormError = err.Error()
+		return false
+	}
+
+	return true
+}
+
 func (m *model) confirmAddService() tea.Cmd {
 	name := strings.TrimSpace(m.addServiceInputs[0].Value())
 	image := strings.TrimSpace(m.addServiceInputs[1].Value())
@@ -78,6 +104,14 @@ func (m *model) confirmAddService() tea.Cmd {
 		return nil
 	}
 
+	if !m.validateAddServiceForm() {
+		return nil
+	}
+
+	ports := splitCommaValues(m.addServiceInputs[2].Value())
+	env := splitCommaValues(m.addServiceInputs[3].Value())
+	volumes := splitCommaValues(m.addServiceInputs[4].Value())
+
 	categories := utils.CategoryOrder()
 	category := categories[m.addServiceCategoryIdx]
 
@@ -86,9 +120,9 @@ func (m *model) confirmAddService() tea.Cmd {
 		Label:        name,
 		Image:        image,
 		Category:     category,
-		Ports:        splitCommaValues(m.addServiceInputs[2].Value()),
-		Env:          splitCommaValues(m.addServiceInputs[3].Value()),
-		VolumeMounts: splitCommaValues(m.addServiceInputs[4].Value()),
+		Ports:        ports,
+		Env:          env,
+		VolumeMounts: volumes,
 	}
 
 	if err := catalog.AppendService(m.root, svc); err != nil {
@@ -121,4 +155,41 @@ func splitCommaValues(s string) []string {
 		}
 	}
 	return result
+}
+
+// validation functions for form inputs
+func validatePorts(ports []string) error {
+	for _, p := range ports {
+		if !strings.Contains(p, ":") {
+			return fmt.Errorf("invalid port format %q: expected host:container (e.g., 8080:80)", p)
+		}
+		parts := strings.Split(p, ":")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid port format %q", p)
+		}
+		for _, part := range parts {
+			if _, err := strconv.Atoi(part); err != nil {
+				return fmt.Errorf("invalid port number in %q: %v", p, err)
+			}
+		}
+	}
+	return nil
+}
+
+func validateEnvVars(env []string) error {
+	for _, e := range env {
+		if !strings.Contains(e, "=") {
+			return fmt.Errorf("invalid env var format %q: expected KEY=VALUE", e)
+		}
+	}
+	return nil
+}
+
+func validateVolumes(volumes []string) error {
+	for _, v := range volumes {
+		if !strings.Contains(v, ":") {
+			return fmt.Errorf("invalid volume format %q: expected host:container (e.g., ./data:/data)", v)
+		}
+	}
+	return nil
 }

@@ -229,9 +229,11 @@ func (m *model) handleAddServiceMsg(msg tea.KeyMsg) tea.Cmd {
 		if idx >= 0 {
 			var cmd tea.Cmd
 			m.addServiceInputs[idx], cmd = m.addServiceInputs[idx].Update(msg)
+			m.validateAddServiceForm() // trigger real-time validation on keystroke
 			return cmd
 		}
 	}
 
 	return nil
 }
+
