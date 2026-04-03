@@ -19,6 +19,7 @@ const (
 	paletteGreen      = lipgloss.Color("#9ece6a")
 	paletteYellow     = lipgloss.Color("#e0af68")
 	paletteRed        = lipgloss.Color("#f7768e")
+	paletteRowFocus   = lipgloss.Color("#252640")
 	maxContentW       = 120
 	minSideLayout     = 100
 	sidePanelW        = 34
@@ -115,7 +116,7 @@ func headerStyle(width int) lipgloss.Style {
 		Background(palettePanel).
 		Foreground(paletteText).
 		BorderBottom(true).
-		BorderStyle(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(paletteBorder)
 }
 
@@ -140,10 +141,17 @@ func cardStyle(width int) lipgloss.Style {
 		Width(ContentWidth(width)).
 		Padding(1, 2).
 		Margin(1, 1).
-		Background(paletteBg).
-		Border(lipgloss.NormalBorder()).
+		Background(palettePanel).
+		Border(lipgloss.RoundedBorder()).
 		BorderForeground(paletteBorder).
 		Foreground(paletteText)
+}
+
+func successCardStyle(width int) lipgloss.Style {
+	if isPlainMode() {
+		return cardStyle(width)
+	}
+	return cardStyle(width).BorderForeground(paletteGreen)
 }
 
 func errorStyle(width int) lipgloss.Style {
@@ -162,45 +170,35 @@ func mutedStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(paletteMuted)
 }
 
-func serviceLineStyle(active bool, selected bool) lipgloss.Style {
-	if isPlainMode() {
-		style := lipgloss.NewStyle()
-		if active {
-			style = style.Bold(true)
-		}
-		return style
-	}
-	style := lipgloss.NewStyle()
-	if selected {
-		style = style.Foreground(paletteGreen)
-	} else {
-		style = style.Foreground(paletteText)
-	}
-	if active {
-		style = style.Bold(true).Foreground(paletteAccent)
-	}
-	return style
-}
-
 func keycapStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle().Bold(true)
 	}
-	return lipgloss.NewStyle().Bold(true).Foreground(paletteCyan)
+	return lipgloss.NewStyle().
+		Background(paletteCyan).
+		Foreground(paletteBg).
+		Bold(true).
+		Padding(0, 1)
 }
 
 func activePreviewTabStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle().Bold(true)
 	}
-	return lipgloss.NewStyle().Bold(true).Foreground(paletteAccent)
+	return lipgloss.NewStyle().
+		Background(paletteAccent).
+		Foreground(paletteBg).
+		Bold(true).
+		Padding(0, 1)
 }
 
 func inactivePreviewTabStyle() lipgloss.Style {
 	if isPlainMode() {
 		return lipgloss.NewStyle()
 	}
-	return lipgloss.NewStyle().Foreground(paletteMuted)
+	return lipgloss.NewStyle().
+		Foreground(paletteMuted).
+		Padding(0, 1)
 }
 
 func blockerTitle() lipgloss.Style {
@@ -246,23 +244,7 @@ func progressBar(current int, total int) string {
 	if filled < 1 {
 		filled = 1
 	}
-	if isPlainMode() {
-		return fmt.Sprintf("[%s%s] %d/%d", strings.Repeat("#", filled), strings.Repeat(".", barWidth-filled), current, total)
-	}
-	filledStr := lipgloss.NewStyle().Foreground(paletteAccent).Render(strings.Repeat("█", filled))
-	emptyStr := lipgloss.NewStyle().Foreground(paletteBorder).Render(strings.Repeat("░", barWidth-filled))
-	label := lipgloss.NewStyle().Foreground(paletteMuted).Render(fmt.Sprintf(" %d/%d", current, total))
-	return filledStr + emptyStr + label
-}
-
-func titleColor(frame int) lipgloss.Color {
-	if isPlainMode() {
-		return paletteText
-	}
-	if frame%24 < 12 {
-		return paletteAccent
-	}
-	return paletteCyan
+	return fmt.Sprintf("[%s%s] %d/%d", strings.Repeat("#", filled), strings.Repeat(".", barWidth-filled), current, total)
 }
 
 func plainHeader(stepIndex int, total int, stepName string, langText string, projectName string, progress string, indent int) string {

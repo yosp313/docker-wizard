@@ -70,6 +70,26 @@ func renderContent(s State) string {
 	}
 }
 
+func buildDotTrail(stepIndex, total int, stepName string) string {
+	if total <= 0 {
+		return ""
+	}
+	var dots []string
+	for i := 1; i <= total; i++ {
+		switch {
+		case i < stepIndex:
+			dots = append(dots, lipgloss.NewStyle().Foreground(paletteGreen).Render("●"))
+		case i == stepIndex:
+			dots = append(dots, lipgloss.NewStyle().Foreground(paletteAccent).Render("◆"))
+		default:
+			dots = append(dots, lipgloss.NewStyle().Foreground(paletteBorder).Render("○"))
+		}
+	}
+	trail := strings.Join(dots, "")
+	label := lipgloss.NewStyle().Foreground(paletteMuted).Render(fmt.Sprintf("  %s (%d/%d)", stepName, stepIndex, total))
+	return trail + label
+}
+
 func renderSidePanel(s State) string {
 	headerH := lipgloss.Height(renderHeader(s))
 	footerH := lipgloss.Height(renderFooter(s))
@@ -78,7 +98,25 @@ func renderSidePanel(s State) string {
 		available = 4
 	}
 
-	lines := []string{sectionTitle(s.SideTitle), ""}
+	spw := sidePanelWidth(s.Width) - 4
+	if spw < 10 {
+		spw = 10
+	}
+	innerW := spw - 2
+	if innerW < 6 {
+		innerW = 6
+	}
+
+	// Title bar: bold accent, NOT uppercased (test checks for exact SideTitle value)
+	titleBar := lipgloss.NewStyle().
+		Background(paletteRowFocus).
+		Foreground(paletteAccent).
+		Bold(true).
+		Width(innerW).
+		Render(s.SideTitle)
+	sep := lipgloss.NewStyle().Foreground(paletteBorder).Render(strings.Repeat("─", innerW))
+
+	lines := []string{titleBar, sep}
 	for _, line := range s.SideLines {
 		if line == "" {
 			lines = append(lines, "")
@@ -87,32 +125,21 @@ func renderSidePanel(s State) string {
 		}
 	}
 	body := strings.Join(lines, "\n")
-	spw := sidePanelWidth(s.Width) - 4
-	if spw < 10 {
-		spw = 10
-	}
 	return sidePanelStyle(spw, available).Render(body)
 }
 
 func renderHeader(s State) string {
-	padding := strings.Repeat(" ", s.HeaderIndent)
 	if isPlainMode() {
 		return plainHeader(s.StepIndex, s.TotalSteps, string(s.Step), s.LanguageText, s.ProjectName, progressBar(s.StepIndex, s.TotalSteps), s.HeaderIndent)
 	}
 
-	title := lipgloss.NewStyle().Bold(true).Foreground(titleColor(s.Frame)).Render("Docker Wizard")
-	subtitle := mutedStyle().Render("Generate Dockerfile and docker-compose from guided selections")
-	project := mutedStyle().Render("project: " + s.ProjectName)
+	line1 := lipgloss.NewStyle().Bold(true).Foreground(paletteAccent).Render("⬡ DOCKER WIZARD")
+	line2 := mutedStyle().Render("generate dockerfile · docker-compose · " + s.ProjectName)
+	line3 := buildDotTrail(s.StepIndex, s.TotalSteps, string(s.Step))
 
-	bar := progressBar(s.StepIndex, s.TotalSteps)
-	bar = lipgloss.NewStyle().Width(ContentWidth(s.Width)).Align(lipgloss.Center).Render(bar)
-
-	heading := lipgloss.JoinVertical(lipgloss.Center, title, subtitle, project)
-	heading = lipgloss.NewStyle().Width(ContentWidth(s.Width)).Align(lipgloss.Center).Render(heading)
-
-	content := lipgloss.JoinVertical(lipgloss.Center, heading, "", bar)
+	content := lipgloss.JoinVertical(lipgloss.Center, line1, line2, line3)
 	content = lipgloss.NewStyle().Width(s.Width).Align(lipgloss.Center).Render(content)
-	return headerStyle(s.Width).Render(padding + content)
+	return headerStyle(s.Width).Render(content)
 }
 
 func renderFooter(s State) string {
@@ -151,9 +178,8 @@ func viewDetect(s State) string {
 	return renderCard(s.Width, "Detect", strings.Join(body, "\n"))
 }
 
-func viewLanguage(s State) string {
-	items := make([]string, 0, len(s.LanguageOptions))
-	for _, option := range s.LanguageOptions {
+func renderOptionRow(option OptionItem) string {
+	if isPlainMode() {
 		cursor := " "
 		if option.Active {
 			cursor = ">"
@@ -164,9 +190,45 @@ func viewLanguage(s State) string {
 		}
 		line := fmt.Sprintf("%s %s %s", cursor, check, option.Label)
 		if option.Description != "" {
-			line += " - " + option.Description
+			line += " — " + option.Description
 		}
-		items = append(items, serviceLineStyle(option.Active, option.Selected).Render(line))
+		return line
+	}
+
+	var parts []string
+
+	// Left accent bar
+	switch {
+	case option.Active:
+		parts = append(parts, lipgloss.NewStyle().Foreground(paletteAccent).Background(paletteRowFocus).Render("│"))
+		parts = append(parts, lipgloss.NewStyle().Background(paletteRowFocus).Render(" "))
+		parts = append(parts, lipgloss.NewStyle().Bold(true).Foreground(paletteAccent).Background(paletteRowFocus).Render(option.Label))
+	case option.Selected:
+		parts = append(parts, lipgloss.NewStyle().Foreground(paletteGreen).Render("│"))
+		parts = append(parts, " ")
+		parts = append(parts, lipgloss.NewStyle().Foreground(paletteGreen).Render(option.Label))
+	default:
+		parts = append(parts, "  ")
+		parts = append(parts, mutedStyle().Render(option.Label))
+	}
+
+	// Selected indicator dot
+	if option.Selected {
+		parts = append(parts, lipgloss.NewStyle().Foreground(paletteGreen).Render(" ●"))
+	}
+
+	// Description
+	if option.Description != "" {
+		parts = append(parts, mutedStyle().Render("  ·  "+option.Description))
+	}
+
+	return strings.Join(parts, "")
+}
+
+func viewLanguage(s State) string {
+	items := make([]string, 0, len(s.LanguageOptions))
+	for _, option := range s.LanguageOptions {
+		items = append(items, renderOptionRow(option))
 	}
 	return renderCard(s.Width, "Language", strings.Join(items, "\n"))
 }
@@ -174,49 +236,66 @@ func viewLanguage(s State) string {
 func viewServices(s State) string {
 	items := make([]string, 0, len(s.ServiceOptions))
 	for _, option := range s.ServiceOptions {
-		cursor := " "
-		if option.Active {
-			cursor = ">"
-		}
-		check := "[ ]"
-		if option.Selected {
-			check = "[x]"
-		}
-		line := fmt.Sprintf("%s %s %s", cursor, check, option.Label)
-		if option.Description != "" {
-			line += " - " + option.Description
-		}
-		items = append(items, serviceLineStyle(option.Active, option.Selected).Render(line))
+		items = append(items, renderOptionRow(option))
 	}
 	return renderCard(s.Width, s.ServiceTitle, strings.Join(items, "\n"))
 }
 
 func viewReview(s State) string {
-	body := []string{
-		"Review your selections:",
-		"",
-		fmt.Sprintf("Detected language: %s", s.DetectedLanguage),
-		"",
-	}
-	for _, group := range s.ReviewGroups {
-		items := group.Items
-		if len(items) == 0 {
-			items = []string{"none"}
+	if isPlainMode() {
+		body := []string{
+			"Review your selections:",
+			"",
+			fmt.Sprintf("Detected language: %s", s.DetectedLanguage),
+			"",
 		}
-		body = append(body, group.Label+":")
-		body = append(body, "- "+strings.Join(items, "\n- "))
+		for _, group := range s.ReviewGroups {
+			items := group.Items
+			if len(items) == 0 {
+				items = []string{"none"}
+			}
+			body = append(body, group.Label+":")
+			body = append(body, "- "+strings.Join(items, "\n- "))
+			body = append(body, "")
+		}
+		body = append(body,
+			"Managed files:",
+			strings.Join(s.ManagedFiles, "\n"),
+			"Existing differing files are merged and backed up as *.bak.",
+		)
+		if len(s.Blockers) > 0 {
+			body = append(body, "", blockerTitle().Render("Blocking issues"), "- "+strings.Join(s.Blockers, "\n- "))
+		}
+		if len(s.Warnings) > 0 {
+			body = append(body, "", warningTitle().Render("Warnings"), "- "+strings.Join(s.Warnings, "\n- "))
+		}
+		return renderCard(s.Width, "Review", strings.Join(body, "\n"))
+	}
+
+	// Styled mode: uppercase group labels, ⚠/△ prefixes, items joined with ·
+	var body []string
+	for _, group := range s.ReviewGroups {
+		labelLine := lipgloss.NewStyle().Foreground(paletteMuted).Render(strings.ToUpper(group.Label))
+		body = append(body, labelLine)
+		if len(group.Items) == 0 {
+			body = append(body, lipgloss.NewStyle().Foreground(paletteMuted).Italic(true).Render("  none"))
+		} else {
+			body = append(body, lipgloss.NewStyle().Foreground(paletteText).Render("  "+strings.Join(group.Items, " · ")))
+		}
 		body = append(body, "")
 	}
-	body = append(body,
-		"Managed files:",
-		strings.Join(s.ManagedFiles, "\n"),
-		"Existing differing files are merged and backed up as *.bak.",
-	)
 	if len(s.Blockers) > 0 {
-		body = append(body, "", blockerTitle().Render("Blocking issues"), "- "+strings.Join(s.Blockers, "\n- "))
+		body = append(body, blockerTitle().Render("⚠ Blocking issues"))
+		for _, b := range s.Blockers {
+			body = append(body, lipgloss.NewStyle().Foreground(paletteRed).Render("  · "+b))
+		}
+		body = append(body, "")
 	}
 	if len(s.Warnings) > 0 {
-		body = append(body, "", warningTitle().Render("Warnings"), "- "+strings.Join(s.Warnings, "\n- "))
+		body = append(body, warningTitle().Render("△ Warnings"))
+		for _, w := range s.Warnings {
+			body = append(body, lipgloss.NewStyle().Foreground(paletteYellow).Render("  · "+w))
+		}
 	}
 	return renderCard(s.Width, "Review", strings.Join(body, "\n"))
 }
@@ -248,9 +327,9 @@ func renderPreviewTabs(tabs []PreviewTab) string {
 	for i, tab := range tabs {
 		label := fmt.Sprintf("%d %s", i+1, tab.Short)
 		if tab.Active {
-			parts = append(parts, activePreviewTabStyle().Render("[> "+label+"]"))
+			parts = append(parts, activePreviewTabStyle().Render(label))
 		} else {
-			parts = append(parts, inactivePreviewTabStyle().Render("[  "+label+"]"))
+			parts = append(parts, inactivePreviewTabStyle().Render(label))
 		}
 	}
 	return strings.Join(parts, "  ")
@@ -262,19 +341,44 @@ func viewGenerate(s State) string {
 }
 
 func viewResult(s State) string {
-	body := []string{
-		successTitle().Render("All set."),
-		"",
-		"Write results:",
-		strings.Join(s.ResultFiles, "\n"),
+	if isPlainMode() {
+		body := []string{
+			successTitle().Render("All set."),
+			"",
+			"Write results:",
+			strings.Join(s.ResultFiles, "\n"),
+		}
+		if len(s.ResultBackups) > 0 {
+			body = append(body, "", "Backups:", strings.Join(s.ResultBackups, "\n"))
+		}
+		if len(s.ResultNextSteps) > 0 {
+			body = append(body, "", "Next steps:", strings.Join(s.ResultNextSteps, "\n"))
+		}
+		return renderCard(s.Width, "Result", strings.Join(body, "\n"))
+	}
+
+	var body []string
+	if len(s.ResultFiles) > 0 {
+		body = append(body, lipgloss.NewStyle().Foreground(paletteMuted).Render("WRITTEN"))
+		for _, f := range s.ResultFiles {
+			body = append(body, "  "+f)
+		}
+		body = append(body, "")
 	}
 	if len(s.ResultBackups) > 0 {
-		body = append(body, "", "Backups:", strings.Join(s.ResultBackups, "\n"))
+		body = append(body, lipgloss.NewStyle().Foreground(paletteMuted).Render("BACKUPS"))
+		for _, b := range s.ResultBackups {
+			body = append(body, "  "+b)
+		}
+		body = append(body, "")
 	}
 	if len(s.ResultNextSteps) > 0 {
-		body = append(body, "", "Next steps:", strings.Join(s.ResultNextSteps, "\n"))
+		body = append(body, lipgloss.NewStyle().Foreground(paletteMuted).Render("NEXT STEPS"))
+		for _, step := range s.ResultNextSteps {
+			body = append(body, "  "+step)
+		}
 	}
-	return renderCard(s.Width, "Result", strings.Join(body, "\n"))
+	return renderSuccessCard(s.Width, "✓ All set.", strings.Join(body, "\n"))
 }
 
 func viewError(s State) string {
@@ -287,7 +391,16 @@ func viewAddService(s State) string {
 }
 
 func renderCard(width int, title string, body string) string {
-	return cardStyle(width).Render(sectionTitle(title) + "\n\n" + body)
+	if isPlainMode() {
+		return cardStyle(width).Render(sectionTitle(title) + "\n\n" + body)
+	}
+	innerW := ContentWidth(width) - 4
+	if innerW < 10 {
+		innerW = 10
+	}
+	titleLine := lipgloss.NewStyle().Bold(true).Foreground(paletteAccent).Render(title)
+	sep := lipgloss.NewStyle().Foreground(paletteBorder).Render(strings.Repeat("─", innerW))
+	return cardStyle(width).Render(titleLine + "\n" + sep + "\n" + body)
 }
 
 func renderErrorCard(width int, title string, body string) string {
@@ -295,7 +408,29 @@ func renderErrorCard(width int, title string, body string) string {
 }
 
 func renderCompactCard(width int, title string, body string) string {
-	return cardStyle(width).Render(sectionTitle(title) + "\n" + body)
+	if isPlainMode() {
+		return cardStyle(width).Render(sectionTitle(title) + "\n" + body)
+	}
+	innerW := ContentWidth(width) - 4
+	if innerW < 10 {
+		innerW = 10
+	}
+	titleLine := lipgloss.NewStyle().Bold(true).Foreground(paletteAccent).Render(title)
+	sep := lipgloss.NewStyle().Foreground(paletteBorder).Render(strings.Repeat("─", innerW))
+	return cardStyle(width).Render(titleLine + "\n" + sep + "\n" + body)
+}
+
+func renderSuccessCard(width int, title string, body string) string {
+	if isPlainMode() {
+		return cardStyle(width).Render(sectionTitle(title) + "\n\n" + body)
+	}
+	innerW := ContentWidth(width) - 4
+	if innerW < 10 {
+		innerW = 10
+	}
+	titleLine := lipgloss.NewStyle().Bold(true).Foreground(paletteGreen).Render(title)
+	sep := lipgloss.NewStyle().Foreground(paletteGreen).Render(strings.Repeat("─", innerW))
+	return successCardStyle(width).Render(titleLine + "\n" + sep + "\n" + body)
 }
 
 func ContentAreaHeight(s State) int {

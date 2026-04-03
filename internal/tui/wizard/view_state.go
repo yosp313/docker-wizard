@@ -156,8 +156,28 @@ func (m model) sideViewLines() []string {
 		lines = append(lines, "Language: detecting...")
 	}
 	lines = append(lines, "")
-	count := len(selectedServiceIDs(m.services, m.selected))
-	lines = append(lines, fmt.Sprintf("Services: %d selected", count))
+
+	grouped := m.selectedByCategory()
+	totalSelected := 0
+	for _, cat := range utils.CategoryOrder() {
+		totalSelected += len(grouped[cat])
+	}
+	if totalSelected == 0 {
+		lines = append(lines, "Services: none")
+	} else {
+		lines = append(lines, fmt.Sprintf("Services (%d):", totalSelected))
+		for _, cat := range utils.CategoryOrder() {
+			svcs := grouped[cat]
+			if len(svcs) == 0 {
+				continue
+			}
+			lines = append(lines, "  "+utils.CategoryLabel(cat)+":")
+			for _, label := range svcs {
+				lines = append(lines, "    · "+label)
+			}
+		}
+	}
+
 	if len(m.warnings) > 0 {
 		lines = append(lines, fmt.Sprintf("Warnings: %d", len(m.warnings)))
 	}
